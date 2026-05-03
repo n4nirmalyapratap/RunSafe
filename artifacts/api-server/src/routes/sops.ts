@@ -295,18 +295,25 @@ router.put("/sops/:sopId/steps", requireAuth, async (req, res): Promise<void> =>
     return;
   }
 
-  const updates = parsed.data.stepIds.map((stepId, index) =>
-    db
-      .update(sopStepsTable)
-      .set({ orderIndex: index })
-      .where(and(eq(sopStepsTable.id, stepId), eq(sopStepsTable.sopId, params.data.sopId)))
-      .returning(),
-  );
+  // Run inside a transaction so partial failure can't leave steps with
+  // duplicate or stale order indexes. We also re-fetch all steps after the
+  // updates so the response reflects the persisted ordering.
+  const steps = await db.transaction(async (tx) => {
+    for (let index = 0; index < parsed.data.stepIds.length; index++) {
+      const stepId = parsed.data.stepIds[index];
+      await tx
+        .update(sopStepsTable)
+        .set({ orderIndex: index })
+        .where(and(eq(sopStepsTable.id, stepId), eq(sopStepsTable.sopId, params.data.sopId)));
+    }
+    return tx
+      .select()
+      .from(sopStepsTable)
+      .where(eq(sopStepsTable.sopId, params.data.sopId))
+      .orderBy(asc(sopStepsTable.orderIndex));
+  });
 
-  const results = await Promise.all(updates);
-  const steps = results.flatMap((r) => r);
-
-  res.json(steps.sort((a, b) => a.orderIndex - b.orderIndex));
+  res.json(steps);
 });
 
 router.patch("/sops/:sopId/steps/:stepId", requireAuth, async (req, res): Promise<void> => {

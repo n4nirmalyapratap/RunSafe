@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request, type Response, type NextFunction } 
 import { eq, and, desc, isNotNull, isNull, notInArray, sql } from "drizzle-orm";
 import { db, complianceItemsTable, complianceCompletionsTable, workspacesTable } from "@workspace/db";
 import { sendEmail } from "../lib/email";
+import { escapeHtml } from "../lib/htmlEscape";
 import {
   GetComplianceItemsQueryParams,
   GetComplianceItemsResponse,
@@ -142,6 +143,10 @@ router.post("/compliance/sync", requireAuth, async (req, res): Promise<void> => 
       .where(
         and(
           eq(complianceItemsTable.workspaceId, ctx!.workspaceId),
+          // Only ever prune items we ourselves seeded from the catalog —
+          // never destroy user-created items, even if their title isn't
+          // in the current jurisdiction's catalog.
+          eq(complianceItemsTable.seededFromCatalog, true),
           isNull(complianceItemsTable.lastCompletedAt),
           notInArray(complianceItemsTable.title, titles),
         ),
@@ -165,6 +170,7 @@ router.post("/compliance/sync", requireAuth, async (req, res): Promise<void> => 
           recurrence: t.recurrence,
           dueDate: t.dueDate ?? undefined,
           status: "pending",
+          seededFromCatalog: true,
         })),
       )
       .onConflictDoNothing({
@@ -224,6 +230,7 @@ router.post("/compliance/initialize", requireAuth, async (req, res): Promise<voi
         dueDate: t.dueDate ?? undefined,
         workspaceId: ctx!.workspaceId,
         status: "pending",
+        seededFromCatalog: true,
       })),
     )
     .returning();
@@ -611,10 +618,17 @@ router.post("/compliance/send-reminders", requireCronToken, async (_req, res): P
 
     const window = isSevenDayWindow ? "7 days" : "1 day";
     const subject = `RunSafe reminder: "${item.title}" is due in ${window}`;
+    // Workspace name and item title are user-supplied; HTML-escape before
+    // interpolating into the email body to prevent injection of links or
+    // markup into outbound transactional mail.
+    const safeWorkspace = escapeHtml(item.workspaceName);
+    const safeTitle = escapeHtml(item.title);
+    const safeDueDate = escapeHtml(item.dueDate);
+    const safeWindow = escapeHtml(window);
     const html = `
       <p>Hi there,</p>
-      <p>This is a friendly reminder from <strong>RunSafe</strong> for <strong>${item.workspaceName}</strong>.</p>
-      <p>The compliance item <strong>${item.title}</strong> is due on <strong>${item.dueDate}</strong> (${window} from today).</p>
+      <p>This is a friendly reminder from <strong>RunSafe</strong> for <strong>${safeWorkspace}</strong>.</p>
+      <p>The compliance item <strong>${safeTitle}</strong> is due on <strong>${safeDueDate}</strong> (${safeWindow} from today).</p>
       <p>Open RunSafe to mark it complete or update the due date.</p>
     `;
     const text = `Reminder: "${item.title}" is due on ${item.dueDate} (${window} from today). Open RunSafe to take action.`;

@@ -6,6 +6,7 @@ import {
 } from "@workspace/db";
 import { createClerkClient } from "@clerk/express";
 import { logger } from "./logger";
+import { escapeHtml } from "./htmlEscape";
 
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
@@ -109,11 +110,14 @@ function buildEmail(
   lines.push("Sign in to RunSafe to mark items complete.");
   const text = lines.join("\n");
 
+  // Workspace name and item titles are user-supplied; HTML-escape every
+  // interpolated string so they cannot inject markup or scripts into the
+  // outbound transactional email body.
   const overdueHtml = overdue.length
     ? `<h3 style="color:#b91c1c;margin:16px 0 8px">Overdue</h3><ul>${overdue
         .map(
           (i) =>
-            `<li><strong>${i.title}</strong> — was due ${i.dueDate} (${Math.abs(i.daysUntilDue)} day(s) ago)</li>`,
+            `<li><strong>${escapeHtml(i.title)}</strong> — was due ${escapeHtml(i.dueDate)} (${escapeHtml(String(Math.abs(i.daysUntilDue)))} day(s) ago)</li>`,
         )
         .join("")}</ul>`
     : "";
@@ -121,7 +125,7 @@ function buildEmail(
     ? `<h3 style="margin:16px 0 8px">Upcoming (next 7 days)</h3><ul>${upcoming
         .map(
           (i) =>
-            `<li><strong>${i.title}</strong> — due ${i.dueDate} (in ${i.daysUntilDue} day(s))</li>`,
+            `<li><strong>${escapeHtml(i.title)}</strong> — due ${escapeHtml(i.dueDate)} (in ${escapeHtml(String(i.daysUntilDue))} day(s))</li>`,
         )
         .join("")}</ul>`
     : "";
@@ -129,7 +133,7 @@ function buildEmail(
   const html = `
     <div style="font-family:system-ui,sans-serif;max-width:560px">
       <h2>Compliance reminder</h2>
-      <p>Workspace: <strong>${workspaceName}</strong></p>
+      <p>Workspace: <strong>${escapeHtml(workspaceName)}</strong></p>
       ${overdueHtml}
       ${upcomingHtml}
       <p style="margin-top:24px;color:#666;font-size:13px">
@@ -253,27 +257,18 @@ export async function runComplianceReminderScan(): Promise<ReminderResult> {
   return result;
 }
 
-let timer: NodeJS.Timeout | null = null;
-
+/**
+ * Historically this function started an in-process setInterval scheduler.
+ * That's unsafe in production: every server replica would run the scan
+ * independently, causing duplicate emails and race conditions on the
+ * `lastReminderSentAt` cooldown. Reminders are now driven exclusively by
+ * the authenticated `POST /api/compliance/send-reminders` endpoint, which
+ * is invoked by an external scheduler (e.g. Replit Scheduled Deployments).
+ * This export is retained as a no-op so any lingering callers stay
+ * harmless.
+ */
 export function startComplianceReminderScheduler(): void {
-  if (timer) return;
-  const intervalMs = 6 * 60 * 60 * 1000; // every 6 hours
-
-  const tick = async () => {
-    try {
-      const r = await runComplianceReminderScan();
-      logger.info(r, "[compliance-reminder] scan complete");
-    } catch (err) {
-      logger.error(
-        { err: err instanceof Error ? err.message : String(err) },
-        "[compliance-reminder] scan failed",
-      );
-    }
-  };
-
-  // First run shortly after startup, then on interval
-  setTimeout(tick, 30_000).unref();
-  timer = setInterval(tick, intervalMs);
-  timer.unref();
-  logger.info({ intervalHours: 6 }, "[compliance-reminder] scheduler started");
+  logger.info(
+    "[compliance-reminder] in-process scheduler disabled; use POST /api/compliance/send-reminders",
+  );
 }

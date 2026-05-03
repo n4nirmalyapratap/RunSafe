@@ -77,6 +77,7 @@ router.post("/workspace", requireAuth, async (req, res): Promise<void> => {
             recurrence: t.recurrence,
             dueDate: t.dueDate ?? undefined,
             status: "pending",
+            seededFromCatalog: true,
           })),
         )
         .onConflictDoNothing({

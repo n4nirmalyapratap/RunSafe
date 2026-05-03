@@ -1,10 +1,13 @@
 import { pgTable, text, serial, integer, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { workspacesTable } from "./workspaces";
 
 export const sopsTable = pgTable("sops", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id").notNull(),
+  workspaceId: integer("workspace_id")
+    .notNull()
+    .references(() => workspacesTable.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   description: text("description"),
   notes: text("notes"),
@@ -16,7 +19,9 @@ export const sopsTable = pgTable("sops", {
 
 export const sopStepsTable = pgTable("sop_steps", {
   id: serial("id").primaryKey(),
-  sopId: integer("sop_id").notNull(),
+  sopId: integer("sop_id")
+    .notNull()
+    .references(() => sopsTable.id, { onDelete: "cascade" }),
   orderIndex: integer("order_index").notNull(),
   title: text("title").notNull(),
   description: text("description"),

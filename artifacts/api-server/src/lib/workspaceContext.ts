@@ -1,4 +1,4 @@
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, ne } from "drizzle-orm";
 import { db, workspacesTable, teamMembersTable } from "@workspace/db";
 import { createClerkClient } from "@clerk/express";
 
@@ -45,7 +45,13 @@ export async function getWorkspaceContext(
       memberRole: teamMembersTable.role,
     })
     .from(teamMembersTable)
-    .where(eq(teamMembersTable.clerkId, clerkId));
+    .where(
+      and(
+        eq(teamMembersTable.clerkId, clerkId),
+        // Disabled members must not regain access via existing clerk link.
+        ne(teamMembersTable.status, "disabled"),
+      ),
+    );
 
   if (member) {
     const [ws] = await db
@@ -82,6 +88,8 @@ export async function getWorkspaceContext(
           and(
             eq(teamMembersTable.email, primaryEmail),
             isNull(teamMembersTable.clerkId),
+            // Don't auto-link a disabled invite — the owner removed them.
+            ne(teamMembersTable.status, "disabled"),
           ),
         );
 

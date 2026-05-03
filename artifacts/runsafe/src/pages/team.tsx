@@ -1,5 +1,5 @@
 import { AppLayout } from "@/components/layout";
-import { useGetTeamMembers, getGetTeamMembersQueryKey, useInviteTeamMember, useRemoveTeamMember } from "@workspace/api-client-react";
+import { useGetTeamMembers, getGetTeamMembersQueryKey, getGetDashboardSummaryQueryKey, useInviteTeamMember, useRemoveTeamMember } from "@workspace/api-client-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -46,7 +46,15 @@ export function Team() {
                 <form onSubmit={form.handleSubmit((v) => {
                   inviteMember.mutate(
                     { data: v },
-                    { onSuccess: () => { qc.invalidateQueries({ queryKey: getGetTeamMembersQueryKey() }); setInviteOpen(false); form.reset(); } }
+                    {
+                      onSuccess: () => {
+                        qc.invalidateQueries({ queryKey: getGetTeamMembersQueryKey() });
+                        // Team count is shown on the dashboard summary card.
+                        qc.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+                        setInviteOpen(false);
+                        form.reset();
+                      },
+                    },
                   );
                 })} className="space-y-4">
                   <FormField control={form.control} name="name" render={({ field }) => (
@@ -58,7 +66,7 @@ export function Team() {
                   <FormField control={form.control} name="role" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Role</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>
                           <SelectItem value="employee">Employee</SelectItem>
@@ -102,7 +110,16 @@ export function Team() {
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" onClick={() => {
                       if (confirm("Are you sure you want to remove this member?")) {
-                        removeMember.mutate({ memberId: member.id }, { onSuccess: () => qc.invalidateQueries({ queryKey: getGetTeamMembersQueryKey() }) });
+                        removeMember.mutate(
+                          { memberId: member.id },
+                          {
+                            onSuccess: () => {
+                              qc.invalidateQueries({ queryKey: getGetTeamMembersQueryKey() });
+                              // Removing a member shrinks the team count card.
+                              qc.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+                            },
+                          },
+                        );
                       }
                     }}>
                       <Trash2 className="h-4 w-4 text-destructive" />
