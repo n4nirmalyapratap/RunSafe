@@ -334,6 +334,40 @@ export const GetTaskAssignmentsResponse = zod.array(
 );
 
 /**
+ * @summary Get a single task assignment with SOP steps and completion state
+ */
+export const GetTaskAssignmentParams = zod.object({
+  taskId: zod.coerce.number(),
+});
+
+export const GetTaskAssignmentResponse = zod.object({
+  id: zod.number(),
+  sopId: zod.number(),
+  sopTitle: zod.string(),
+  sopDescription: zod.string().nullish(),
+  workspaceId: zod.number(),
+  assigneeId: zod.number(),
+  assigneeName: zod.string(),
+  assigneeEmail: zod.string(),
+  status: zod.enum(["pending", "in_progress", "completed"]),
+  dueDate: zod.coerce.date().nullish(),
+  completedAt: zod.coerce.date().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  steps: zod.array(
+    zod.object({
+      id: zod.number(),
+      sopId: zod.number(),
+      orderIndex: zod.number(),
+      title: zod.string(),
+      description: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  completedStepIds: zod.array(zod.number()),
+});
+
+/**
  * @summary Update a task assignment (status, progress)
  */
 export const UpdateTaskAssignmentParams = zod.object({
@@ -376,6 +410,14 @@ export const CompleteTaskStepResponse = zod.object({
   taskAssignmentId: zod.number(),
   sopStepId: zod.number(),
   completedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Unmark a step as complete within a task
+ */
+export const UncompleteTaskStepParams = zod.object({
+  taskId: zod.coerce.number(),
+  stepId: zod.coerce.number(),
 });
 
 /**
@@ -500,6 +542,8 @@ export const GetComplianceAuditLogResponse = zod.array(
 /**
  * @summary Get dashboard summary stats
  */
+export const getDashboardSummaryResponseUpcomingComplianceDeadlinesDefault = [];
+
 export const GetDashboardSummaryResponse = zod.object({
   totalSops: zod.number(),
   totalTaskAssignments: zod.number(),
@@ -534,14 +578,16 @@ export const GetDashboardSummaryResponse = zod.object({
       createdAt: zod.coerce.date(),
     }),
   ),
-  upcomingComplianceDeadlines: zod.array(
-    zod.object({
-      id: zod.number(),
-      title: zod.string(),
-      category: zod.string(),
-      dueDate: zod.string(),
-      daysUntilDue: zod.number(),
-      status: zod.enum(["overdue", "upcoming"]),
-    }),
-  ).default([]),
+  upcomingComplianceDeadlines: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        title: zod.string(),
+        category: zod.string(),
+        dueDate: zod.coerce.date(),
+        daysUntilDue: zod.number(),
+        status: zod.enum(["overdue", "upcoming"]),
+      }),
+    )
+    .default(getDashboardSummaryResponseUpcomingComplianceDeadlinesDefault),
 });

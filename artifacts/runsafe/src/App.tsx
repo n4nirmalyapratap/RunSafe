@@ -17,6 +17,7 @@ import { Dashboard } from "@/pages/dashboard";
 import { Sops } from "@/pages/sops";
 import { SopDetail } from "@/pages/sop-detail";
 import { Tasks } from "@/pages/tasks";
+import { TaskDetail } from "@/pages/task-detail";
 import { Compliance } from "@/pages/compliance";
 import { Team } from "@/pages/team";
 import { Settings } from "@/pages/settings";
@@ -166,6 +167,7 @@ function ClerkProviderWithRoutes() {
           {/* Member-accessible routes */}
           <Route path="/dashboard"><ProtectedRoute component={Dashboard} /></Route>
           <Route path="/tasks"><ProtectedRoute component={Tasks} /></Route>
+          <Route path="/tasks/:taskId"><ProtectedRoute component={TaskDetail} /></Route>
 
           {/* Owner-only routes — members redirected to /dashboard */}
           <Route path="/sops"><OwnerRoute component={Sops} /></Route>

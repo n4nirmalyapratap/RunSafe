@@ -414,6 +414,23 @@ paths:
                   $ref: "#/components/schemas/TaskAssignment"
 
   /tasks/{taskId}:
+    get:
+      operationId: getTaskAssignment
+      tags: [tasks]
+      summary: Get a single task assignment with SOP steps and completion state
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Task assignment detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskAssignmentDetail"
     patch:
       operationId: updateTaskAssignment
       tags: [tasks]
@@ -461,6 +478,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TaskStepCompletion"
+    delete:
+      operationId: uncompleteTaskStep
+      tags: [tasks]
+      summary: Unmark a step as complete within a task
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: stepId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Step completion removed
 
   # ─── COMPLIANCE ──────────────────────────────────────────────────
   /compliance/items:
@@ -997,6 +1032,60 @@ components:
         - taskAssignmentId
         - sopStepId
         - completedAt
+
+    TaskAssignmentDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        sopId:
+          type: integer
+        sopTitle:
+          type: string
+        sopDescription:
+          type: ["string", "null"]
+        workspaceId:
+          type: integer
+        assigneeId:
+          type: integer
+        assigneeName:
+          type: string
+        assigneeEmail:
+          type: string
+        status:
+          type: string
+          enum: [pending, in_progress, completed]
+        dueDate:
+          type: ["string", "null"]
+          format: date
+        completedAt:
+          type: ["string", "null"]
+          format: date-time
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/SopStep"
+        completedStepIds:
+          type: array
+          items:
+            type: integer
+      required:
+        - id
+        - sopId
+        - sopTitle
+        - workspaceId
+        - assigneeId
+        - assigneeName
+        - assigneeEmail
+        - status
+        - createdAt
+        - steps
+        - completedStepIds
 
     # ─── COMPLIANCE ──────────────────────────────────────────────
     ComplianceItem:

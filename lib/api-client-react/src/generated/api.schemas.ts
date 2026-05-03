@@ -274,6 +274,37 @@ export interface TaskStepCompletion {
   completedAt: string;
 }
 
+export type TaskAssignmentDetailStatus =
+  (typeof TaskAssignmentDetailStatus)[keyof typeof TaskAssignmentDetailStatus];
+
+export const TaskAssignmentDetailStatus = {
+  pending: "pending",
+  in_progress: "in_progress",
+  completed: "completed",
+} as const;
+
+export interface TaskAssignmentDetail {
+  id: number;
+  sopId: number;
+  sopTitle: string;
+  /** @nullable */
+  sopDescription?: string | null;
+  workspaceId: number;
+  assigneeId: number;
+  assigneeName: string;
+  assigneeEmail: string;
+  status: TaskAssignmentDetailStatus;
+  /** @nullable */
+  dueDate?: string | null;
+  /** @nullable */
+  completedAt?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  createdAt: string;
+  steps: SopStep[];
+  completedStepIds: number[];
+}
+
 export type ComplianceItemCategory =
   (typeof ComplianceItemCategory)[keyof typeof ComplianceItemCategory];
 
@@ -432,13 +463,21 @@ export interface ActivityItem {
   createdAt: string;
 }
 
+export type UpcomingComplianceDeadlineStatus =
+  (typeof UpcomingComplianceDeadlineStatus)[keyof typeof UpcomingComplianceDeadlineStatus];
+
+export const UpcomingComplianceDeadlineStatus = {
+  overdue: "overdue",
+  upcoming: "upcoming",
+} as const;
+
 export interface UpcomingComplianceDeadline {
   id: number;
   title: string;
   category: string;
   dueDate: string;
   daysUntilDue: number;
-  status: "overdue" | "upcoming";
+  status: UpcomingComplianceDeadlineStatus;
 }
 
 export interface DashboardSummary {

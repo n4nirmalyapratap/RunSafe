@@ -1,0 +1,14 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "DpooaWkcfe-lls6YCHXrn"
+uri = "file://.local/outputs/Market-Gap-Finder.pptx"
+type = "slides"
+title = "Market Gap Finder.pptx"
+
+[[outputs]]
+id = "H9qKLGEoID0oQxM1XUMUC"
+uri = "file://.local/outputs/Market-Gap-Finder.pdf"
+type = "pdf"
+title = "Market Gap Finder.pdf"

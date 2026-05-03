@@ -37,6 +37,7 @@ import type {
   SopDetail,
   SopStep,
   TaskAssignment,
+  TaskAssignmentDetail,
   TaskStepCompletion,
   TeamMember,
   UpdateComplianceItemBody,
@@ -1661,6 +1662,94 @@ export function useGetTaskAssignments<
 }
 
 /**
+ * @summary Get a single task assignment with SOP steps and completion state
+ */
+export const getGetTaskAssignmentUrl = (taskId: number) => {
+  return `/api/tasks/${taskId}`;
+};
+
+export const getTaskAssignment = async (
+  taskId: number,
+  options?: RequestInit,
+): Promise<TaskAssignmentDetail> => {
+  return customFetch<TaskAssignmentDetail>(getGetTaskAssignmentUrl(taskId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetTaskAssignmentQueryKey = (taskId: number) => {
+  return [`/api/tasks/${taskId}`] as const;
+};
+
+export const getGetTaskAssignmentQueryOptions = <
+  TData = Awaited<ReturnType<typeof getTaskAssignment>>,
+  TError = ErrorType<unknown>,
+>(
+  taskId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getTaskAssignment>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetTaskAssignmentQueryKey(taskId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getTaskAssignment>>
+  > = ({ signal }) => getTaskAssignment(taskId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!taskId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getTaskAssignment>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetTaskAssignmentQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getTaskAssignment>>
+>;
+export type GetTaskAssignmentQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get a single task assignment with SOP steps and completion state
+ */
+
+export function useGetTaskAssignment<
+  TData = Awaited<ReturnType<typeof getTaskAssignment>>,
+  TError = ErrorType<unknown>,
+>(
+  taskId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getTaskAssignment>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetTaskAssignmentQueryOptions(taskId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * @summary Update a task assignment (status, progress)
  */
 export const getUpdateTaskAssignmentUrl = (taskId: number) => {
@@ -1834,6 +1923,91 @@ export const useCompleteTaskStep = <
   TContext
 > => {
   return useMutation(getCompleteTaskStepMutationOptions(options));
+};
+
+/**
+ * @summary Unmark a step as complete within a task
+ */
+export const getUncompleteTaskStepUrl = (taskId: number, stepId: number) => {
+  return `/api/tasks/${taskId}/steps/${stepId}/complete`;
+};
+
+export const uncompleteTaskStep = async (
+  taskId: number,
+  stepId: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getUncompleteTaskStepUrl(taskId, stepId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getUncompleteTaskStepMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof uncompleteTaskStep>>,
+    TError,
+    { taskId: number; stepId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof uncompleteTaskStep>>,
+  TError,
+  { taskId: number; stepId: number },
+  TContext
+> => {
+  const mutationKey = ["uncompleteTaskStep"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof uncompleteTaskStep>>,
+    { taskId: number; stepId: number }
+  > = (props) => {
+    const { taskId, stepId } = props ?? {};
+
+    return uncompleteTaskStep(taskId, stepId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UncompleteTaskStepMutationResult = NonNullable<
+  Awaited<ReturnType<typeof uncompleteTaskStep>>
+>;
+
+export type UncompleteTaskStepMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Unmark a step as complete within a task
+ */
+export const useUncompleteTaskStep = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof uncompleteTaskStep>>,
+    TError,
+    { taskId: number; stepId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof uncompleteTaskStep>>,
+  TError,
+  { taskId: number; stepId: number },
+  TContext
+> => {
+  return useMutation(getUncompleteTaskStepMutationOptions(options));
 };
 
 /**

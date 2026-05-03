@@ -7,6 +7,7 @@
  */
 import type { ActivityItem } from "./activityItem";
 import type { NextDueComplianceItem } from "./nextDueComplianceItem";
+import type { UpcomingComplianceDeadline } from "./upcomingComplianceDeadline";
 
 export interface DashboardSummary {
   totalSops: number;
@@ -19,4 +20,5 @@ export interface DashboardSummary {
   nextDueComplianceItem: null | NextDueComplianceItem;
   teamMemberCount: number;
   recentActivity: ActivityItem[];
+  upcomingComplianceDeadlines?: UpcomingComplianceDeadline[];
 }
