@@ -498,6 +498,32 @@ paths:
           description: Step completion removed
 
   # ─── COMPLIANCE ──────────────────────────────────────────────────
+  /compliance/meta:
+    get:
+      operationId: getComplianceMeta
+      tags: [compliance]
+      summary: Supported countries, states, and industries for the compliance catalog
+      responses:
+        "200":
+          description: Catalog metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComplianceMeta"
+
+  /compliance/sync:
+    post:
+      operationId: syncComplianceFromCatalog
+      tags: [compliance]
+      summary: Idempotently add catalog items missing for the workspace's country / state / industry
+      responses:
+        "200":
+          description: Number of items added vs. skipped
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncComplianceResponse"
+
   /compliance/items:
     get:
       operationId: getComplianceItems
@@ -697,6 +723,50 @@ components:
           type: integer
       required:
         - name
+
+    ComplianceMeta:
+      type: object
+      properties:
+        countries:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              name:
+                type: string
+              states:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    code:
+                      type: string
+                    name:
+                      type: string
+                  required: [code, name]
+            required: [code, name, states]
+        industries:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              name:
+                type: string
+            required: [code, name]
+      required: [countries, industries]
+
+    SyncComplianceResponse:
+      type: object
+      properties:
+        added:
+          type: integer
+        skipped:
+          type: integer
+      required: [added, skipped]
 
     UpdateWorkspaceBody:
       type: object

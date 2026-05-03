@@ -18,7 +18,11 @@ import { requireAuth, getClerkUserId } from "../middlewares/requireAuth";
 import { getWorkspaceContext } from "../lib/workspaceContext";
 import { createClerkClient } from "@clerk/express";
 import { runComplianceReminderScan } from "../lib/complianceReminders";
-import { resolveComplianceTemplates } from "../lib/complianceCatalog";
+import {
+  resolveComplianceTemplates,
+  SUPPORTED_COUNTRIES,
+  SUPPORTED_INDUSTRIES,
+} from "../lib/complianceCatalog";
 
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
@@ -92,6 +96,65 @@ function requireOwnerWithPlan(
   return null;
 }
 
+
+// Public to authenticated workspace members — no plan gate, used to render
+// onboarding & settings forms.
+router.get("/compliance/meta", requireAuth, async (_req, res): Promise<void> => {
+  res.json({
+    countries: SUPPORTED_COUNTRIES,
+    industries: SUPPORTED_INDUSTRIES,
+  });
+});
+
+// Idempotent re-seed: adds catalog items missing for the workspace's
+// current country/state/industry. Existing items (with matching titles) are
+// untouched, preserving completion history and any user customisations.
+router.post("/compliance/sync", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = getClerkUserId(req);
+  const ctx = await getWorkspaceContext(clerkId);
+  const authErr = requireOwnerWithPlan(ctx);
+  if (authErr) {
+    res.status(ctx ? 403 : 404).json({ error: authErr });
+    return;
+  }
+
+  const [ws] = await db
+    .select()
+    .from(workspacesTable)
+    .where(eq(workspacesTable.id, ctx!.workspaceId));
+
+  const templates = resolveComplianceTemplates({
+    country: ws?.country ?? null,
+    state: ws?.state ?? null,
+    industry: ws?.industry ?? null,
+  });
+
+  // Race-safe: rely on the (workspace_id, title) unique index. ON CONFLICT
+  // DO NOTHING means parallel /sync calls can never double-insert.
+  let added = 0;
+  if (templates.length > 0) {
+    const inserted = await db
+      .insert(complianceItemsTable)
+      .values(
+        templates.map((t) => ({
+          workspaceId: ctx!.workspaceId,
+          title: t.title,
+          description: t.description,
+          category: t.category,
+          recurrence: t.recurrence,
+          dueDate: t.dueDate ?? undefined,
+          status: "pending",
+        })),
+      )
+      .onConflictDoNothing({
+        target: [complianceItemsTable.workspaceId, complianceItemsTable.title],
+      })
+      .returning();
+    added = inserted.length;
+  }
+
+  res.json({ added, skipped: templates.length - added });
+});
 
 router.post("/compliance/initialize", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);

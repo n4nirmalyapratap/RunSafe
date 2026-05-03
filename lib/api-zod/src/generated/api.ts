@@ -425,6 +425,38 @@ export const UncompleteTaskStepParams = zod.object({
 });
 
 /**
+ * @summary Supported countries, states, and industries for the compliance catalog
+ */
+export const GetComplianceMetaResponse = zod.object({
+  countries: zod.array(
+    zod.object({
+      code: zod.string(),
+      name: zod.string(),
+      states: zod.array(
+        zod.object({
+          code: zod.string(),
+          name: zod.string(),
+        }),
+      ),
+    }),
+  ),
+  industries: zod.array(
+    zod.object({
+      code: zod.string(),
+      name: zod.string(),
+    }),
+  ),
+});
+
+/**
+ * @summary Idempotently add catalog items missing for the workspace's country / state / industry
+ */
+export const SyncComplianceFromCatalogResponse = zod.object({
+  added: zod.number(),
+  skipped: zod.number(),
+});
+
+/**
  * @summary List compliance items for the workspace
  */
 export const GetComplianceItemsQueryParams = zod.object({

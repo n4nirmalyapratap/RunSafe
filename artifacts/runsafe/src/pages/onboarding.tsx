@@ -2,7 +2,11 @@ import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useCreateWorkspace } from "@workspace/api-client-react";
+import {
+  useCreateWorkspace,
+  useGetComplianceMeta,
+  getGetComplianceMetaQueryKey,
+} from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -18,86 +22,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ShieldCheck } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
-const COUNTRIES: { code: string; name: string; states: { code: string; name: string }[] }[] = [
-  {
-    code: "US",
-    name: "United States",
-    states: [
-      { code: "CA", name: "California" },
-      { code: "NY", name: "New York" },
-      { code: "TX", name: "Texas" },
-      { code: "FL", name: "Florida" },
-      { code: "IL", name: "Illinois" },
-      { code: "WA", name: "Washington" },
-      { code: "OTHER", name: "Other state" },
-    ],
-  },
-  {
-    code: "IN",
-    name: "India",
-    states: [
-      { code: "MH", name: "Maharashtra" },
-      { code: "KA", name: "Karnataka" },
-      { code: "DL", name: "Delhi" },
-      { code: "TN", name: "Tamil Nadu" },
-      { code: "GJ", name: "Gujarat" },
-      { code: "WB", name: "West Bengal" },
-      { code: "UP", name: "Uttar Pradesh" },
-      { code: "OTHER", name: "Other state" },
-    ],
-  },
-  {
-    code: "GB",
-    name: "United Kingdom",
-    states: [
-      { code: "ENG", name: "England" },
-      { code: "SCT", name: "Scotland" },
-      { code: "WLS", name: "Wales" },
-      { code: "NIR", name: "Northern Ireland" },
-    ],
-  },
-  {
-    code: "DE",
-    name: "Germany",
-    states: [
-      { code: "BY", name: "Bayern" },
-      { code: "BE", name: "Berlin" },
-      { code: "NW", name: "Nordrhein-Westfalen" },
-      { code: "OTHER", name: "Other Bundesland" },
-    ],
-  },
-  {
-    code: "FR",
-    name: "France",
-    states: [
-      { code: "IDF", name: "Île-de-France" },
-      { code: "ARA", name: "Auvergne-Rhône-Alpes" },
-      { code: "OTHER", name: "Other région" },
-    ],
-  },
-  {
-    code: "JP",
-    name: "Japan",
-    states: [
-      { code: "13", name: "Tokyo" },
-      { code: "27", name: "Osaka" },
-      { code: "OTHER", name: "Other prefecture" },
-    ],
-  },
-  {
-    code: "AU",
-    name: "Australia",
-    states: [
-      { code: "NSW", name: "New South Wales" },
-      { code: "VIC", name: "Victoria" },
-      { code: "QLD", name: "Queensland" },
-      { code: "WA", name: "Western Australia" },
-      { code: "OTHER", name: "Other state/territory" },
-    ],
-  },
-  { code: "OTHER", name: "Other country", states: [] },
-];
-
 const formSchema = z.object({
   name: z.string().min(2, { message: "Workspace name is required." }),
   industry: z.string().optional(),
@@ -110,6 +34,9 @@ export function Onboarding() {
   const [, setLocation] = useLocation();
   const createWorkspace = useCreateWorkspace();
   const queryClient = useQueryClient();
+  const { data: meta } = useGetComplianceMeta({
+    query: { queryKey: getGetComplianceMetaQueryKey() },
+  });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -123,7 +50,7 @@ export function Onboarding() {
   });
 
   const selectedCountry = form.watch("country");
-  const states = COUNTRIES.find((c) => c.code === selectedCountry)?.states ?? [];
+  const states = meta?.countries.find((c) => c.code === selectedCountry)?.states ?? [];
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     createWorkspace.mutate(
@@ -185,7 +112,7 @@ export function Onboarding() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {COUNTRIES.map((c) => (
+                      {(meta?.countries ?? []).map((c) => (
                         <SelectItem key={c.code} value={c.code}>
                           {c.name}
                         </SelectItem>
@@ -240,11 +167,11 @@ export function Onboarding() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="retail">Retail</SelectItem>
-                      <SelectItem value="restaurant">Restaurant / F&B</SelectItem>
-                      <SelectItem value="salon">Salon / Spa</SelectItem>
-                      <SelectItem value="services">Professional Services</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
+                      {(meta?.industries ?? []).map((i) => (
+                        <SelectItem key={i.code} value={i.code}>
+                          {i.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />

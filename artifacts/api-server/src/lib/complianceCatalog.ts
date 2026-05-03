@@ -13,6 +13,11 @@ export type ComplianceTemplate = {
   category: TemplateCategory;
   recurrence: TemplateRecurrence;
   industries?: string[];
+  /**
+   * Optional regulator-aware due-date function. When omitted, falls back to
+   * a generic 30/60/90-day offset based on `recurrence`.
+   */
+  nextDue?: () => string;
 };
 
 type Jurisdiction = {
@@ -104,12 +109,82 @@ export const SUPPORTED_COUNTRIES: SupportedCountry[] = [
       { code: "OTHER", name: "Other state/territory" },
     ],
   },
-  {
-    code: "OTHER",
-    name: "Other country",
-    states: [],
-  },
+  { code: "OTHER", name: "Other country", states: [] },
 ];
+
+export const SUPPORTED_INDUSTRIES: { code: string; name: string }[] = [
+  { code: "retail", name: "Retail" },
+  { code: "restaurant", name: "Restaurant / F&B" },
+  { code: "salon", name: "Salon / Spa" },
+  { code: "services", name: "Professional Services" },
+  { code: "other", name: "Other" },
+];
+
+// ─── Date helpers (regulator-aware) ────────────────────────────
+function toYmd(d: Date): string {
+  return d.toISOString().split("T")[0];
+}
+
+/** Last calendar day of the given (year, 0-indexed month). */
+function lastDayOfMonth(year: number, month: number): number {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+/** Build a Date clamped so that `day > daysInMonth` collapses to the last day. */
+function clampedDate(year: number, monthZero: number, day: number): Date {
+  const last = lastDayOfMonth(year, monthZero);
+  return new Date(year, monthZero, Math.min(day, last));
+}
+
+/** Next occurrence of an annual deadline at month/day (1-indexed month). */
+function nextAnnual(month: number, day: number): string {
+  const today = new Date();
+  const monthZero = month - 1;
+  let candidate = clampedDate(today.getFullYear(), monthZero, day);
+  if (candidate <= today) {
+    candidate = clampedDate(today.getFullYear() + 1, monthZero, day);
+  }
+  return toYmd(candidate);
+}
+
+/** Next occurrence of a monthly deadline on the given day of the month (clamped). */
+function nextMonthDay(day: number): string {
+  const today = new Date();
+  let year = today.getFullYear();
+  let monthZero = today.getMonth();
+  let candidate = clampedDate(year, monthZero, day);
+  if (candidate <= today) {
+    monthZero += 1;
+    if (monthZero > 11) {
+      monthZero = 0;
+      year += 1;
+    }
+    candidate = clampedDate(year, monthZero, day);
+  }
+  return toYmd(candidate);
+}
+
+/** Next quarter end (Mar/Jun/Sep/Dec) plus N calendar days (e.g. BAS = +28). */
+function nextQuarterEndPlus(daysAfter: number): string {
+  const today = new Date();
+  const year = today.getFullYear();
+  const quarterEnds = [
+    new Date(year, 2, 31), // Mar 31
+    new Date(year, 5, 30), // Jun 30
+    new Date(year, 8, 30), // Sep 30
+    new Date(year, 11, 31), // Dec 31
+    new Date(year + 1, 2, 31), // Mar 31 next year
+  ];
+  for (const qe of quarterEnds) {
+    const due = new Date(qe);
+    due.setDate(due.getDate() + daysAfter);
+    if (due > today) return toYmd(due);
+  }
+  // Unreachable, but keep deterministic
+  const fallback = new Date(year + 1, 5, 30);
+  fallback.setDate(fallback.getDate() + daysAfter);
+  return toYmd(fallback);
+}
 
 const GLOBAL: ComplianceTemplate[] = [
   {
@@ -160,12 +235,14 @@ const JURISDICTIONS: Jurisdiction[] = [
         description: "Post the prior year's injury & illness summary in a visible workplace location.",
         category: "health_safety",
         recurrence: "annually",
+        nextDue: () => nextAnnual(2, 1), // Feb 1
       },
       {
-        title: "Federal & state payroll tax filings",
-        description: "Confirm 941, state withholding, and unemployment filings are submitted on time.",
+        title: "Federal & state payroll tax filings (Form 941)",
+        description: "Submit quarterly Form 941 and state withholding/UI filings.",
         category: "tax",
         recurrence: "quarterly",
+        nextDue: () => nextQuarterEndPlus(30), // last day of month following quarter
       },
       {
         title: "Business license renewal",
@@ -250,28 +327,49 @@ const JURISDICTIONS: Jurisdiction[] = [
         recurrence: "annually",
       },
       {
-        title: "GSTR-1 / GSTR-3B filing",
-        description: "File monthly GST returns by the prescribed due dates.",
+        title: "GSTR-3B monthly filing",
+        description: "File monthly GSTR-3B by the 20th of the following month.",
         category: "tax",
         recurrence: "monthly",
+        nextDue: () => nextMonthDay(20),
+      },
+      {
+        title: "GSTR-1 monthly filing",
+        description: "File monthly outward supplies return GSTR-1 by the 11th of the following month.",
+        category: "tax",
+        recurrence: "monthly",
+        nextDue: () => nextMonthDay(11),
       },
       {
         title: "TDS return filing (Form 24Q / 26Q)",
-        description: "File quarterly TDS returns for salaries and vendor payments.",
+        description: "File quarterly TDS returns by Jul 31, Oct 31, Jan 31, May 31.",
         category: "tax",
         recurrence: "quarterly",
+        nextDue: () => {
+          const today = new Date();
+          const candidates = [
+            new Date(today.getFullYear(), 4, 31), // May 31
+            new Date(today.getFullYear(), 6, 31), // Jul 31
+            new Date(today.getFullYear(), 9, 31), // Oct 31
+            new Date(today.getFullYear() + 1, 0, 31), // Jan 31 next year
+          ];
+          for (const c of candidates) if (c > today) return toYmd(c);
+          return toYmd(new Date(today.getFullYear() + 1, 4, 31));
+        },
       },
       {
         title: "EPF & ESI monthly contributions",
-        description: "Deposit Provident Fund and ESI contributions and file ECR.",
+        description: "Deposit Provident Fund and ESI contributions and file ECR by the 15th.",
         category: "employment",
         recurrence: "monthly",
+        nextDue: () => nextMonthDay(15),
       },
       {
         title: "Professional Tax filing",
         description: "Deduct and remit Professional Tax per state schedule.",
         category: "tax",
         recurrence: "monthly",
+        nextDue: () => nextMonthDay(10),
       },
       {
         title: "Fire NOC renewal",
@@ -304,6 +402,7 @@ const JURISDICTIONS: Jurisdiction[] = [
         description: "Remit semi-annual employer + employee LWF contributions.",
         category: "employment",
         recurrence: "annually",
+        nextDue: () => nextAnnual(6, 30),
       },
     ],
   },
@@ -316,6 +415,7 @@ const JURISDICTIONS: Jurisdiction[] = [
         description: "Annual KLWF contribution by Jan 15.",
         category: "employment",
         recurrence: "annually",
+        nextDue: () => nextAnnual(1, 15),
       },
     ],
   },
@@ -326,15 +426,17 @@ const JURISDICTIONS: Jurisdiction[] = [
     templates: [
       {
         title: "VAT return filing",
-        description: "Submit Making Tax Digital VAT return each quarter.",
+        description: "Submit Making Tax Digital VAT return — typically 1 month + 7 days after quarter end.",
         category: "tax",
         recurrence: "quarterly",
+        nextDue: () => nextQuarterEndPlus(37),
       },
       {
         title: "PAYE / RTI submission",
         description: "Submit Real Time Information PAYE filings on or before each payday.",
         category: "tax",
         recurrence: "monthly",
+        nextDue: () => nextMonthDay(19),
       },
       {
         title: "Pensions auto-enrolment review",
@@ -378,12 +480,14 @@ const JURISDICTIONS: Jurisdiction[] = [
         description: "Jährlichen Beitrag und Lohnnachweis an die zuständige BG melden.",
         category: "employment",
         recurrence: "annually",
+        nextDue: () => nextAnnual(2, 11), // Lohnnachweis: 11 Feb
       },
       {
         title: "Umsatzsteuer-Voranmeldung",
-        description: "Monatliche Umsatzsteuer-Voranmeldung über ELSTER einreichen.",
+        description: "Monatliche Umsatzsteuer-Voranmeldung über ELSTER einreichen — bis zum 10. des Folgemonats.",
         category: "tax",
         recurrence: "monthly",
+        nextDue: () => nextMonthDay(10),
       },
       {
         title: "Arbeitsschutz-Gefährdungsbeurteilung",
@@ -406,15 +510,17 @@ const JURISDICTIONS: Jurisdiction[] = [
       },
       {
         title: "Déclaration URSSAF (DSN)",
-        description: "Transmettre la Déclaration Sociale Nominative chaque mois.",
+        description: "Transmettre la Déclaration Sociale Nominative chaque mois — avant le 15.",
         category: "employment",
         recurrence: "monthly",
+        nextDue: () => nextMonthDay(15),
       },
       {
         title: "Déclaration de TVA",
         description: "Déposer la déclaration de TVA selon le régime applicable.",
         category: "tax",
         recurrence: "monthly",
+        nextDue: () => nextMonthDay(24),
       },
       {
         title: "Affichages obligatoires",
@@ -440,12 +546,14 @@ const JURISDICTIONS: Jurisdiction[] = [
         description: "毎年6月〜7月に労働保険の年度更新手続きを行う。",
         category: "employment",
         recurrence: "annually",
+        nextDue: () => nextAnnual(7, 10),
       },
       {
         title: "社会保険 算定基礎届 (Standard monthly remuneration report)",
         description: "毎年7月10日までに算定基礎届を提出する。",
         category: "employment",
         recurrence: "annually",
+        nextDue: () => nextAnnual(7, 10),
       },
       {
         title: "消費税申告 (Consumption tax filing)",
@@ -474,15 +582,17 @@ const JURISDICTIONS: Jurisdiction[] = [
     templates: [
       {
         title: "BAS — Business Activity Statement",
-        description: "Lodge the BAS with the ATO each quarter.",
+        description: "Lodge the BAS with the ATO — quarter end + 28 days.",
         category: "tax",
         recurrence: "quarterly",
+        nextDue: () => nextQuarterEndPlus(28),
       },
       {
         title: "Superannuation Guarantee payments",
-        description: "Pay quarterly super contributions for eligible employees by the due date.",
+        description: "Pay quarterly super contributions for eligible employees by quarter end + 28 days.",
         category: "employment",
         recurrence: "quarterly",
+        nextDue: () => nextQuarterEndPlus(28),
       },
       {
         title: "WHS hazard & risk audit",
@@ -544,7 +654,7 @@ function defaultDueDate(recurrence: TemplateRecurrence): string | null {
       d.setDate(d.getDate() + 90);
       break;
   }
-  return d.toISOString().split("T")[0];
+  return toYmd(d);
 }
 
 export type ResolvedComplianceItem = {
@@ -567,7 +677,6 @@ export function resolveComplianceTemplates(profile: {
   state?: string | null;
   industry?: string | null;
 }): ResolvedComplianceItem[] {
-  // Treat empty strings as missing
   const country = profile.country && profile.country.length > 0 ? profile.country : null;
   const state = profile.state && profile.state.length > 0 ? profile.state : null;
   const industry = profile.industry && profile.industry.length > 0 ? profile.industry : null;
@@ -582,12 +691,8 @@ export function resolveComplianceTemplates(profile: {
     }
   }
 
-  // De-dupe by title (state items may repeat country titles)
   const seen = new Set<string>();
   const filtered = collected.filter((t) => {
-    // Industry-specific templates are only included when the workspace's
-    // industry matches one of the listed industries. Templates without an
-    // `industries` field apply universally.
     if (t.industries && (!industry || !t.industries.includes(industry))) return false;
     if (seen.has(t.title)) return false;
     seen.add(t.title);
@@ -599,6 +704,6 @@ export function resolveComplianceTemplates(profile: {
     description: t.description,
     category: t.category,
     recurrence: t.recurrence,
-    dueDate: defaultDueDate(t.recurrence),
+    dueDate: t.nextDue ? t.nextDue() : defaultDueDate(t.recurrence),
   }));
 }

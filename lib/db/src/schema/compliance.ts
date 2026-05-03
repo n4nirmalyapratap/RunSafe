@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp, date } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, date, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -17,7 +17,9 @@ export const complianceItemsTable = pgTable("compliance_items", {
   reminder1SentForDueDate: date("reminder_1_sent_for_due_date"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
-});
+}, (t) => ({
+  workspaceTitleUq: uniqueIndex("compliance_items_workspace_title_uq").on(t.workspaceId, t.title),
+}));
 
 export const complianceCompletionsTable = pgTable("compliance_completions", {
   id: serial("id").primaryKey(),

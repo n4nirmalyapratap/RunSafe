@@ -58,6 +58,32 @@ export interface CreateWorkspaceBody {
   employeeCount?: number;
 }
 
+export type ComplianceMetaCountriesItemStatesItem = {
+  code: string;
+  name: string;
+};
+
+export type ComplianceMetaCountriesItem = {
+  code: string;
+  name: string;
+  states: ComplianceMetaCountriesItemStatesItem[];
+};
+
+export type ComplianceMetaIndustriesItem = {
+  code: string;
+  name: string;
+};
+
+export interface ComplianceMeta {
+  countries: ComplianceMetaCountriesItem[];
+  industries: ComplianceMetaIndustriesItem[];
+}
+
+export interface SyncComplianceResponse {
+  added: number;
+  skipped: number;
+}
+
 export type UpdateWorkspaceBodyPlan =
   (typeof UpdateWorkspaceBodyPlan)[keyof typeof UpdateWorkspaceBodyPlan];
 

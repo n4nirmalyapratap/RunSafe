@@ -7,7 +7,10 @@ import {
   useCompleteComplianceItem,
   useGetComplianceAuditLog,
   getGetComplianceAuditLogQueryKey,
+  useSyncComplianceFromCatalog,
 } from "@workspace/api-client-react";
+import { useToast } from "@/hooks/use-toast";
+import { RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   ShieldAlert,
@@ -36,7 +39,9 @@ async function initializeCompliance() {
 
 export function Compliance() {
   const qc = useQueryClient();
+  const { toast } = useToast();
   const [initializing, setInitializing] = useState(false);
+  const syncCompliance = useSyncComplianceFromCatalog();
 
   const { data: workspace, isLoading: wsLoading } = useGetWorkspace({
     query: { queryKey: getGetWorkspaceQueryKey() },
@@ -98,7 +103,7 @@ export function Compliance() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold tracking-tight">Compliance Autopilot</h1>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
             {overdueCount > 0 && (
               <Badge variant="destructive">{overdueCount} Overdue</Badge>
             )}
@@ -106,6 +111,33 @@ export function Compliance() {
               <Badge variant="outline" className="border-amber-500 text-amber-600">
                 {upcomingCount} Due Soon
               </Badge>
+            )}
+            {!isEmpty && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={syncCompliance.isPending}
+                onClick={() =>
+                  syncCompliance.mutate(undefined, {
+                    onSuccess: (data) => {
+                      qc.invalidateQueries({ queryKey: getGetComplianceItemsQueryKey() });
+                      toast({
+                        title: "Checklist synced",
+                        description: `${data.added} new · ${data.skipped} already present`,
+                      });
+                    },
+                    onError: (err) =>
+                      toast({
+                        title: "Sync failed",
+                        description: err instanceof Error ? err.message : "Please try again.",
+                        variant: "destructive",
+                      }),
+                  })
+                }
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${syncCompliance.isPending ? "animate-spin" : ""}`} />
+                {syncCompliance.isPending ? "Syncing…" : "Sync from catalog"}
+              </Button>
             )}
           </div>
         </div>
