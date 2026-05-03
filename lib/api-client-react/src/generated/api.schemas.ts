@@ -151,6 +151,16 @@ export interface SopStep {
   createdAt: string;
 }
 
+export interface SopAssignment {
+  id: number;
+  assigneeName: string;
+  assigneeEmail: string;
+  status: string;
+  /** @nullable */
+  dueDate?: string | null;
+  createdAt: string;
+}
+
 export interface SopDetail {
   id: number;
   workspaceId: number;
@@ -165,6 +175,7 @@ export interface SopDetail {
   createdAt: string;
   updatedAt: string;
   steps: SopStep[];
+  assignments?: SopAssignment[];
 }
 
 export interface CreateSopBody {

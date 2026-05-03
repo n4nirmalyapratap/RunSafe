@@ -10,7 +10,7 @@ import {
   useReorderSopSteps,
   useUpdateSop,
 } from "@workspace/api-client-react";
-import type { SopDetail } from "@workspace/api-client-react";
+import type { SopDetail, SopAssignment } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -58,18 +58,6 @@ import type { SopStep } from "@workspace/api-client-react";
 import { Textarea } from "@/components/ui/textarea";
 import { FileText, Save } from "lucide-react";
 
-interface SopAssignment {
-  id: number;
-  assigneeName: string;
-  assigneeEmail: string;
-  status: string;
-  dueDate?: string | null;
-  createdAt: string;
-}
-
-interface SopDetailWithAssignments extends SopDetail {
-  assignments: SopAssignment[];
-}
 
 const stepSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -158,7 +146,7 @@ export function SopDetail() {
   const { data: sopRaw, isLoading } = useGetSop(sopId, {
     query: { enabled: !!sopId, queryKey: getGetSopQueryKey(sopId) },
   });
-  const sop = sopRaw as SopDetailWithAssignments | undefined;
+  const sop = sopRaw as SopDetail | undefined;
 
   const { data: team } = useGetTeamMembers({ query: { queryKey: getGetTeamMembersQueryKey() } });
 

@@ -171,6 +171,16 @@ export const GetSopResponse = zod.object({
       createdAt: zod.coerce.date(),
     }),
   ),
+  assignments: zod.array(
+    zod.object({
+      id: zod.number(),
+      assigneeName: zod.string(),
+      assigneeEmail: zod.string(),
+      status: zod.string(),
+      dueDate: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+    }),
+  ).optional(),
 });
 
 /**
