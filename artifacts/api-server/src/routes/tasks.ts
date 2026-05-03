@@ -55,6 +55,10 @@ router.get("/tasks", requireAuth, async (req, res): Promise<void> => {
 
   const whereClause = and(baseWhere, memberFilter, statusFilter, assigneeFilter);
 
+  // Single query with LEFT JOINs + GROUP BY instead of correlated subqueries —
+  // avoids N+1 on stepsTotal/stepsCompleted as the task list grows. We use
+  // COUNT(DISTINCT ...) so the cross-product from joining both child tables
+  // doesn't double-count.
   const rows = await db
     .select({
       id: taskAssignmentsTable.id,
@@ -69,13 +73,19 @@ router.get("/tasks", requireAuth, async (req, res): Promise<void> => {
       completedAt: taskAssignmentsTable.completedAt,
       notes: taskAssignmentsTable.notes,
       createdAt: taskAssignmentsTable.createdAt,
-      stepsTotal: sql<number>`(select count(*) from sop_steps where sop_steps.sop_id = ${taskAssignmentsTable.sopId})::int`,
-      stepsCompleted: sql<number>`(select count(*) from task_step_completions where task_step_completions.task_assignment_id = ${taskAssignmentsTable.id})::int`,
+      stepsTotal: sql<number>`count(distinct ${sopStepsTable.id})::int`,
+      stepsCompleted: sql<number>`count(distinct ${taskStepCompletionsTable.id})::int`,
     })
     .from(taskAssignmentsTable)
     .innerJoin(sopsTable, eq(sopsTable.id, taskAssignmentsTable.sopId))
     .innerJoin(teamMembersTable, eq(teamMembersTable.id, taskAssignmentsTable.assigneeId))
-    .where(whereClause);
+    .leftJoin(sopStepsTable, eq(sopStepsTable.sopId, taskAssignmentsTable.sopId))
+    .leftJoin(
+      taskStepCompletionsTable,
+      eq(taskStepCompletionsTable.taskAssignmentId, taskAssignmentsTable.id),
+    )
+    .where(whereClause)
+    .groupBy(taskAssignmentsTable.id, sopsTable.id, teamMembersTable.id);
 
   res.json(GetTaskAssignmentsResponse.parse(rows));
 });

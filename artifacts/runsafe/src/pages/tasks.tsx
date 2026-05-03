@@ -2,6 +2,7 @@ import { AppLayout } from "@/components/layout";
 import {
   useGetTaskAssignments,
   getGetTaskAssignmentsQueryKey,
+  getGetDashboardSummaryQueryKey,
   useUpdateTaskAssignment,
   type TaskAssignment,
 } from "@workspace/api-client-react";
@@ -230,6 +231,9 @@ export function Tasks() {
       {
         onSuccess: () => {
           qc.invalidateQueries({ queryKey: getGetTaskAssignmentsQueryKey() });
+          // Dashboard summary tracks pending/overdue/completed task counts —
+          // moving a card across columns changes them.
+          qc.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
         },
         onError: () => {
           if (prev) qc.setQueryData(getGetTaskAssignmentsQueryKey(), prev);

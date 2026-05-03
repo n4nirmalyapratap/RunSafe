@@ -12,6 +12,7 @@ import {
 import { requireAuth, getClerkUserId } from "../middlewares/requireAuth";
 import { getWorkspaceContext } from "../lib/workspaceContext";
 import { createClerkClient } from "@clerk/express";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -39,7 +40,9 @@ async function sendInviteEmail(email: string): Promise<{ sent: boolean; error?: 
     return { sent: true };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.warn(`[team] Clerk invitation email failed for ${email}:`, msg);
+    // Use the structured logger so this surfaces with request context in
+    // production rather than going to bare stdout.
+    logger.warn({ email, err: msg }, "[team] Clerk invitation email failed");
     return { sent: false, error: msg };
   }
 }

@@ -3,6 +3,8 @@ import { useParams } from "wouter";
 import {
   useGetSop,
   getGetSopQueryKey,
+  getGetSopsQueryKey,
+  getGetDashboardSummaryQueryKey,
   useAddSopStep,
   useAssignSop,
   useGetTeamMembers,
@@ -237,7 +239,14 @@ export function SopDetail() {
                           toast({ title: "Assigned successfully" });
                           setAssignOpen(false);
                           qc.invalidateQueries({ queryKey: getGetSopQueryKey(sopId) });
+                          // The SOPs list shows the assignment count, and the
+                          // dashboard summary tracks pending tasks — refresh both.
+                          qc.invalidateQueries({ queryKey: getGetSopsQueryKey() });
+                          qc.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+                          assignForm.reset();
                         },
+                        onError: () =>
+                          toast({ title: "Failed to assign SOP", variant: "destructive" }),
                       },
                     );
                   })}
@@ -249,7 +258,10 @@ export function SopDetail() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Team Member</FormLabel>
-                        <Select onValueChange={field.onChange}>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value != null ? String(field.value) : undefined}
+                        >
                           <FormControl>
                             <SelectTrigger><SelectValue placeholder="Select member" /></SelectTrigger>
                           </FormControl>
@@ -312,9 +324,13 @@ export function SopDetail() {
                         {
                           onSuccess: () => {
                             qc.invalidateQueries({ queryKey: getGetSopQueryKey(sopId) });
+                            // The SOPs list page shows step counts — keep them fresh.
+                            qc.invalidateQueries({ queryKey: getGetSopsQueryKey() });
                             setStepOpen(false);
                             stepForm.reset();
                           },
+                          onError: () =>
+                            toast({ title: "Failed to add step", variant: "destructive" }),
                         },
                       );
                     })}

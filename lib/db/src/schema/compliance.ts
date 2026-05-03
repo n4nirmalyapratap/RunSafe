@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp, date, boolean, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, date, boolean, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { workspacesTable } from "./workspaces";
@@ -26,6 +26,9 @@ export const complianceItemsTable = pgTable("compliance_items", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 }, (t) => ({
   workspaceTitleUq: uniqueIndex("compliance_items_workspace_title_uq").on(t.workspaceId, t.title),
+  // Speeds up dashboard "next due" / overdue scans and the reminder cron,
+  // which routinely filter compliance_items by workspace_id and dueDate.
+  workspaceDueIdx: index("compliance_items_workspace_due_idx").on(t.workspaceId, t.dueDate),
 }));
 
 export const complianceCompletionsTable = pgTable("compliance_completions", {
