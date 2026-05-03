@@ -301,11 +301,11 @@ export function SopVideoPlayer({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl p-0 bg-slate-950 border-slate-800 text-white overflow-hidden">
+      <DialogContent className="max-w-4xl w-[95vw] max-h-[92vh] p-0 bg-slate-950 border-slate-800 text-white overflow-hidden flex flex-col gap-0">
         <DialogTitle className="sr-only">Training video for {sopTitle}</DialogTitle>
 
         {/* Top bar */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800">
+        <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 border-b border-slate-800">
           <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-slate-400 font-medium">
             <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
             Training Mode
@@ -320,7 +320,7 @@ export function SopVideoPlayer({
         </div>
 
         {/* Slide stage */}
-        <div className="relative aspect-video bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 flex items-center justify-center px-12 py-10">
+        <div className="relative flex-1 min-h-[260px] bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 flex items-center justify-center px-6 sm:px-12 py-8 sm:py-10 overflow-y-auto">
           {noSteps ? (
             <div className="text-center text-slate-400">
               <div className="text-lg font-semibold mb-2">No steps to play</div>
@@ -328,31 +328,33 @@ export function SopVideoPlayer({
             </div>
           ) : slide?.kind === "title" ? (
             <div className="text-center max-w-2xl">
-              <div className="text-xs uppercase tracking-[0.2em] text-blue-400 font-semibold mb-4">
+              <div className="text-[10px] sm:text-xs uppercase tracking-[0.2em] text-blue-400 font-semibold mb-3 sm:mb-4">
                 Standard Operating Procedure
               </div>
-              <h2 className="text-4xl md:text-5xl font-bold tracking-tight leading-tight mb-4">
+              <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold tracking-tight leading-tight mb-3 sm:mb-4">
                 {slide.title}
               </h2>
               {slide.body && (
-                <p className="text-lg text-slate-300 leading-relaxed">{slide.body}</p>
+                <p className="text-sm sm:text-base md:text-lg text-slate-300 leading-relaxed">
+                  {slide.body}
+                </p>
               )}
             </div>
           ) : (
             <div className="w-full max-w-3xl">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="h-12 w-12 rounded-full bg-blue-500 text-white font-bold flex items-center justify-center text-lg">
+              <div className="flex items-center gap-3 mb-4 sm:mb-6">
+                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-blue-500 text-white font-bold flex items-center justify-center text-base sm:text-lg">
                   {slide.index}
                 </div>
-                <div className="text-xs uppercase tracking-[0.2em] text-slate-400 font-semibold">
+                <div className="text-[10px] sm:text-xs uppercase tracking-[0.2em] text-slate-400 font-semibold">
                   Step {slide.index} of {slide.total}
                 </div>
               </div>
-              <h2 className="text-3xl md:text-4xl font-bold tracking-tight leading-snug mb-4">
+              <h2 className="text-xl sm:text-2xl md:text-4xl font-bold tracking-tight leading-snug mb-3 sm:mb-4">
                 {slide.title}
               </h2>
               {slide.body && (
-                <p className="text-lg text-slate-300 leading-relaxed whitespace-pre-wrap">
+                <p className="text-sm sm:text-base md:text-lg text-slate-300 leading-relaxed whitespace-pre-wrap">
                   {slide.body}
                 </p>
               )}
@@ -371,7 +373,7 @@ export function SopVideoPlayer({
         </div>
 
         {/* Overall progress + controls */}
-        <div className="px-5 py-4 space-y-3 bg-slate-900 border-t border-slate-800">
+        <div className="flex-shrink-0 px-5 py-4 space-y-3 bg-slate-900 border-t border-slate-800">
           <div className="flex items-center gap-3">
             <span className="text-xs font-mono text-slate-400 w-16">
               {idx + 1} / {slides.length}
