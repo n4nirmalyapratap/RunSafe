@@ -1,0 +1,51 @@
+# syntax=docker/dockerfile:1.7
+
+# ─── Stage 1: install workspace dependencies ────────────────────────────────
+FROM node:24-alpine AS deps
+WORKDIR /repo
+
+RUN apk add --no-cache libc6-compat \
+ && corepack enable \
+ && corepack prepare pnpm@10.26.1 --activate
+
+# Copy lockfile + workspace manifests so the install layer caches well.
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
+COPY tsconfig.base.json tsconfig.json ./
+COPY artifacts/api-server/package.json artifacts/api-server/
+COPY artifacts/runsafe/package.json artifacts/runsafe/
+COPY artifacts/runsafe-pitch/package.json artifacts/runsafe-pitch/
+COPY artifacts/mockup-sandbox/package.json artifacts/mockup-sandbox/
+COPY lib/api-spec/package.json lib/api-spec/
+COPY lib/api-zod/package.json lib/api-zod/
+COPY lib/api-client-react/package.json lib/api-client-react/
+COPY lib/db/package.json lib/db/
+COPY scripts/package.json scripts/
+
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
+
+# ─── Stage 2: build api server bundle ───────────────────────────────────────
+FROM deps AS build
+WORKDIR /repo
+COPY . .
+
+# Generate API client/types and build the api-server (esbuild bundle → dist/).
+RUN pnpm --filter @workspace/api-spec run codegen \
+ && pnpm --filter @workspace/api-server run build
+
+# ─── Stage 3: minimal runtime image ─────────────────────────────────────────
+FROM node:24-alpine AS runtime
+WORKDIR /app
+
+ENV NODE_ENV=production \
+    PORT=8080
+
+RUN addgroup -S app && adduser -S app -G app
+
+# The esbuild bundle in dist/ is self-contained, so we only need the bundle.
+COPY --from=build --chown=app:app /repo/artifacts/api-server/dist ./dist
+
+USER app
+EXPOSE 8080
+
+CMD ["node", "--enable-source-maps", "./dist/index.mjs"]

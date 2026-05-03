@@ -106,3 +106,15 @@ Demo seed data: "Green Leaf Cafe" workspace (ownerClerkId: "demo_seed_owner"), 3
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+
+## Docker Deployment
+
+A production-style container stack lives in `docker/` + `docker-compose.yml`:
+
+- `docker/Dockerfile.api` — multi-stage esbuild bundle of the API server (~200MB runtime).
+- `docker/Dockerfile.web` — Vite SPA build served by nginx, with `/api` proxied to the api container.
+- `docker/Dockerfile.migrate` — one-shot `drizzle-kit push` job, blocks api startup until schema is applied.
+- `docker/nginx.conf` — SPA fallback + `/api/` reverse proxy to `http://api:8080`.
+- `.env.docker.example` — required env vars (Clerk keys, Postgres creds, optional SendGrid).
+
+Quick start: `cp .env.docker.example .env.docker && docker compose --env-file .env.docker up --build` → SPA on `http://localhost:8000`. Full docs in `docker/README.md`.
