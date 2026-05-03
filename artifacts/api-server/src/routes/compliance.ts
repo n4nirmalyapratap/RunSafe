@@ -22,6 +22,7 @@ const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 const router: IRouter = Router();
 
 function computeStatus(dueDate: string | null, lastCompletedAt: Date | null): string {
+  if (lastCompletedAt) return "completed";
   if (!dueDate) return "pending";
   const due = new Date(dueDate);
   const now = new Date();
