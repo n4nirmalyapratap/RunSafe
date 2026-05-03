@@ -185,6 +185,21 @@ router.post("/tasks/:taskId/steps/:stepId/complete", requireAuth, async (req, re
     return;
   }
 
+  const [validStep] = await db
+    .select()
+    .from(sopStepsTable)
+    .where(
+      and(
+        eq(sopStepsTable.id, params.data.stepId),
+        eq(sopStepsTable.sopId, task.sopId),
+      ),
+    );
+
+  if (!validStep) {
+    res.status(404).json({ error: "Step not found for this task's SOP" });
+    return;
+  }
+
   const existing = await db
     .select()
     .from(taskStepCompletionsTable)

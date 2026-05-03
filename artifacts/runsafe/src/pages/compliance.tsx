@@ -9,7 +9,15 @@ import {
   getGetComplianceAuditLogQueryKey,
 } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
-import { ShieldAlert, CheckCircle2, AlertTriangle, CalendarClock, ClipboardList, FileText } from "lucide-react";
+import {
+  ShieldAlert,
+  CheckCircle2,
+  AlertTriangle,
+  CalendarClock,
+  ClipboardList,
+  FileText,
+  Sparkles,
+} from "lucide-react";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQueryClient } from "@tanstack/react-query";
@@ -17,9 +25,19 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useState } from "react";
+
+async function initializeCompliance() {
+  const res = await fetch("/api/compliance/initialize", { method: "POST" });
+  if (!res.ok && res.status !== 409) {
+    throw new Error("Failed to initialize compliance checklist");
+  }
+}
 
 export function Compliance() {
   const qc = useQueryClient();
+  const [initializing, setInitializing] = useState(false);
+
   const { data: workspace, isLoading: wsLoading } = useGetWorkspace({
     query: { queryKey: getGetWorkspaceQueryKey() },
   });
@@ -54,19 +72,26 @@ export function Compliance() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "completed":
-        return <CheckCircle2 className="text-green-500 w-5 h-5" />;
-      case "overdue":
-        return <AlertTriangle className="text-destructive w-5 h-5" />;
-      case "upcoming":
-        return <CalendarClock className="text-amber-500 w-5 h-5" />;
-      default:
-        return <div className="w-5 h-5 rounded-full border-2 border-muted-foreground" />;
+      case "completed": return <CheckCircle2 className="text-green-500 w-5 h-5" />;
+      case "overdue": return <AlertTriangle className="text-destructive w-5 h-5" />;
+      case "upcoming": return <CalendarClock className="text-amber-500 w-5 h-5" />;
+      default: return <div className="w-5 h-5 rounded-full border-2 border-muted-foreground" />;
     }
   };
 
   const overdueCount = items?.filter((i) => i.status === "overdue").length ?? 0;
   const upcomingCount = items?.filter((i) => i.status === "upcoming").length ?? 0;
+  const isEmpty = (items?.length ?? 0) === 0;
+
+  const handleInitialize = async () => {
+    setInitializing(true);
+    try {
+      await initializeCompliance();
+      qc.invalidateQueries({ queryKey: getGetComplianceItemsQueryKey() });
+    } finally {
+      setInitializing(false);
+    }
+  };
 
   return (
     <AppLayout>
@@ -98,68 +123,76 @@ export function Compliance() {
           </TabsList>
 
           <TabsContent value="checklist" className="mt-4 space-y-4">
-            {items?.map((item) => (
-              <Card
-                key={item.id}
-                className={item.status === "overdue" ? "border-destructive shadow-sm" : ""}
-              >
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-6 gap-4">
-                  <div className="flex gap-4 items-start">
-                    <div className="mt-1">{getStatusIcon(item.status)}</div>
-                    <div>
-                      <h3 className="font-semibold text-lg">{item.title}</h3>
-                      <p className="text-muted-foreground text-sm max-w-2xl">{item.description}</p>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        <Badge variant="secondary">{item.category.replace("_", " ")}</Badge>
-                        <Badge variant="outline">{item.recurrence.replace("_", " ")}</Badge>
-                        {item.dueDate && (
-                          <Badge
-                            variant={item.status === "overdue" ? "destructive" : "outline"}
-                          >
-                            Due: {format(new Date(item.dueDate), "MMM d, yyyy")}
-                          </Badge>
-                        )}
-                        {item.lastCompletedAt && (
-                          <Badge variant="secondary" className="text-green-700 border-green-200 bg-green-50">
-                            Last done: {format(new Date(item.lastCompletedAt), "MMM d, yyyy")}
-                          </Badge>
-                        )}
+            {isEmpty ? (
+              <div className="border rounded-lg p-12 text-center space-y-4">
+                <div className="h-14 w-14 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto">
+                  <Sparkles className="h-7 w-7 text-primary" />
+                </div>
+                <h3 className="text-xl font-semibold">No compliance items yet</h3>
+                <p className="text-muted-foreground max-w-sm mx-auto">
+                  Start with a pre-built checklist covering employment, health &amp; safety,
+                  licensing, and data privacy — or add items manually.
+                </p>
+                <Button onClick={handleInitialize} disabled={initializing}>
+                  {initializing ? "Loading…" : "Load Pre-built Checklist"}
+                </Button>
+              </div>
+            ) : (
+              items?.map((item) => (
+                <Card
+                  key={item.id}
+                  className={item.status === "overdue" ? "border-destructive shadow-sm" : ""}
+                >
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-6 gap-4">
+                    <div className="flex gap-4 items-start">
+                      <div className="mt-1">{getStatusIcon(item.status)}</div>
+                      <div>
+                        <h3 className="font-semibold text-lg">{item.title}</h3>
+                        <p className="text-muted-foreground text-sm max-w-2xl">{item.description}</p>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          <Badge variant="secondary">{item.category.replace("_", " ")}</Badge>
+                          <Badge variant="outline">{item.recurrence.replace("_", " ")}</Badge>
+                          {item.dueDate && (
+                            <Badge variant={item.status === "overdue" ? "destructive" : "outline"}>
+                              Due: {format(new Date(item.dueDate), "MMM d, yyyy")}
+                            </Badge>
+                          )}
+                          {item.lastCompletedAt && (
+                            <Badge variant="secondary" className="text-green-700 border-green-200 bg-green-50">
+                              Last done: {format(new Date(item.lastCompletedAt), "MMM d, yyyy")}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="w-full md:w-auto">
-                    {item.status !== "completed" && (
-                      <Button
-                        className="w-full md:w-auto"
-                        disabled={completeItem.isPending}
-                        onClick={() => {
-                          completeItem.mutate(
-                            { itemId: item.id, data: { completedAt: new Date().toISOString() } },
-                            {
-                              onSuccess: () => {
-                                qc.invalidateQueries({ queryKey: getGetComplianceItemsQueryKey() });
-                                qc.invalidateQueries({ queryKey: getGetComplianceAuditLogQueryKey() });
+                    <div className="w-full md:w-auto">
+                      {item.status !== "completed" ? (
+                        <Button
+                          className="w-full md:w-auto"
+                          disabled={completeItem.isPending}
+                          onClick={() => {
+                            completeItem.mutate(
+                              { itemId: item.id, data: { completedAt: new Date().toISOString() } },
+                              {
+                                onSuccess: () => {
+                                  qc.invalidateQueries({ queryKey: getGetComplianceItemsQueryKey() });
+                                  qc.invalidateQueries({ queryKey: getGetComplianceAuditLogQueryKey() });
+                                },
                               },
-                            },
-                          );
-                        }}
-                      >
-                        Mark Complete
-                      </Button>
-                    )}
-                    {item.status === "completed" && (
-                      <span className="inline-flex items-center gap-1.5 text-sm text-green-600 font-medium">
-                        <CheckCircle2 className="h-4 w-4" /> Completed
-                      </span>
-                    )}
+                            );
+                          }}
+                        >
+                          Mark Complete
+                        </Button>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 text-sm text-green-600 font-medium">
+                          <CheckCircle2 className="h-4 w-4" /> Completed
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </Card>
-            ))}
-            {items?.length === 0 && (
-              <div className="text-center py-12 border rounded-lg text-muted-foreground">
-                No compliance items configured.
-              </div>
+                </Card>
+              ))
             )}
           </TabsContent>
 
@@ -188,9 +221,7 @@ export function Compliance() {
                               ? format(new Date(entry.completedAt), "MMM d, yyyy h:mm a")
                               : "—"}
                           </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {entry.notes ?? "—"}
-                          </TableCell>
+                          <TableCell className="text-muted-foreground">{entry.notes ?? "—"}</TableCell>
                         </TableRow>
                       ))
                     ) : (

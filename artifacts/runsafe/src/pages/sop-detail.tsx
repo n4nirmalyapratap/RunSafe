@@ -7,6 +7,7 @@ import {
   useAssignSop,
   useGetTeamMembers,
   getGetTeamMembersQueryKey,
+  useReorderSopSteps,
 } from "@workspace/api-client-react";
 import type { SopDetail } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,18 +15,45 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Plus, UserPlus, GripVertical, Users } from "lucide-react";
 import { Link } from "wouter";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import type { SopStep } from "@workspace/api-client-react";
 
 interface SopAssignment {
   id: number;
@@ -56,6 +84,68 @@ const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive" | 
   completed: "default",
 };
 
+function DraggableStepList({
+  steps,
+  onReorder,
+}: {
+  steps: SopStep[];
+  onReorder: (orderedIds: number[]) => void;
+}) {
+  const [localSteps, setLocalSteps] = useState<SopStep[]>(steps);
+  const dragIndexRef = useRef<number | null>(null);
+
+  const handleDragStart = (idx: number) => {
+    dragIndexRef.current = idx;
+  };
+
+  const handleDragOver = (e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    const from = dragIndexRef.current;
+    if (from == null || from === idx) return;
+    const next = [...localSteps];
+    const [moved] = next.splice(from, 1);
+    next.splice(idx, 0, moved);
+    dragIndexRef.current = idx;
+    setLocalSteps(next);
+  };
+
+  const handleDrop = () => {
+    onReorder(localSteps.map((s) => s.id));
+    dragIndexRef.current = null;
+  };
+
+  if (localSteps.length === 0) {
+    return (
+      <div className="text-center text-muted-foreground py-8">No steps yet. Add one above.</div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {localSteps.map((step, idx) => (
+        <div
+          key={step.id}
+          draggable
+          onDragStart={() => handleDragStart(idx)}
+          onDragOver={(e) => handleDragOver(e, idx)}
+          onDrop={handleDrop}
+          className="flex gap-4 p-4 border rounded-md bg-background items-start cursor-default select-none"
+        >
+          <div className="mt-1 cursor-grab active:cursor-grabbing text-muted-foreground">
+            <GripVertical className="h-5 w-5" />
+          </div>
+          <div className="flex-1">
+            <div className="font-medium">Step {idx + 1}: {step.title}</div>
+            {step.description && (
+              <div className="text-sm text-muted-foreground mt-1">{step.description}</div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function SopDetail() {
   const params = useParams();
   const sopId = Number(params.sopId);
@@ -71,6 +161,7 @@ export function SopDetail() {
 
   const addStep = useAddSopStep();
   const assignSop = useAssignSop();
+  const reorderSteps = useReorderSopSteps();
 
   const [stepOpen, setStepOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
@@ -87,6 +178,16 @@ export function SopDetail() {
   if (!sop) return <AppLayout>SOP not found</AppLayout>;
 
   const assignments: SopAssignment[] = sop.assignments ?? [];
+
+  const handleReorder = (orderedIds: number[]) => {
+    reorderSteps.mutate(
+      { sopId, data: { stepIds: orderedIds } },
+      {
+        onSuccess: () => qc.invalidateQueries({ queryKey: getGetSopQueryKey(sopId) }),
+        onError: () => toast({ title: "Failed to save order", variant: "destructive" }),
+      },
+    );
+  };
 
   return (
     <AppLayout>
@@ -113,7 +214,14 @@ export function SopDetail() {
                 <form
                   onSubmit={assignForm.handleSubmit((v) => {
                     assignSop.mutate(
-                      { sopId, data: { assigneeId: v.assigneeId, notes: v.notes, dueDate: v.dueDate || undefined } },
+                      {
+                        sopId,
+                        data: {
+                          assigneeId: v.assigneeId,
+                          notes: v.notes,
+                          dueDate: v.dueDate || undefined,
+                        },
+                      },
                       {
                         onSuccess: () => {
                           toast({ title: "Assigned successfully" });
@@ -175,8 +283,11 @@ export function SopDetail() {
         </div>
 
         <div className="bg-card border rounded-lg p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-semibold">Steps</h2>
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h2 className="text-xl font-semibold">Steps</h2>
+              <p className="text-sm text-muted-foreground mt-0.5">Drag to reorder steps</p>
+            </div>
             <Dialog open={stepOpen} onOpenChange={setStepOpen}>
               <DialogTrigger asChild>
                 <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Add Step</Button>
@@ -228,25 +339,7 @@ export function SopDetail() {
             </Dialog>
           </div>
 
-          <div className="space-y-3">
-            {sop.steps?.length === 0 ? (
-              <div className="text-center text-muted-foreground py-8">No steps yet. Add one above.</div>
-            ) : (
-              sop.steps?.map((step, idx) => (
-                <div key={step.id} className="flex gap-4 p-4 border rounded-md bg-background items-start">
-                  <div className="mt-1 cursor-move text-muted-foreground">
-                    <GripVertical className="h-5 w-5" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-medium">Step {idx + 1}: {step.title}</div>
-                    {step.description && (
-                      <div className="text-sm text-muted-foreground mt-1">{step.description}</div>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+          <DraggableStepList steps={sop.steps ?? []} onReorder={handleReorder} />
         </div>
 
         <div className="bg-card border rounded-lg p-6">

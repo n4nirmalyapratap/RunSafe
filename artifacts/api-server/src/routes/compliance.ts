@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, desc } from "drizzle-orm";
-import { db, workspacesTable, complianceItemsTable, complianceCompletionsTable } from "@workspace/db";
+import { db, complianceItemsTable, complianceCompletionsTable } from "@workspace/db";
 import {
   GetComplianceItemsQueryParams,
   GetComplianceItemsResponse,
@@ -28,25 +28,112 @@ function computeStatus(dueDate: string | null, lastCompletedAt: Date | null): st
   return "pending";
 }
 
-function requireOwnerOrPlan(ctx: { role: string; plan: string } | null, requiredPlan?: "growth" | "pro") {
+function requireOwnerWithPlan(
+  ctx: { role: string; plan: string } | null,
+  requiredPlan: "growth" | "pro" = "growth",
+): string | null {
   if (!ctx) return "Workspace not found";
   if (ctx.role !== "owner") return "Only workspace owners can access compliance features";
-  if (requiredPlan) {
-    const planRank: Record<string, number> = { starter: 0, growth: 1, pro: 2 };
-    const required = planRank[requiredPlan] ?? 1;
-    const current = planRank[ctx.plan] ?? 0;
-    if (current < required) return `This feature requires the ${requiredPlan} plan or higher`;
+  const planRank: Record<string, number> = { starter: 0, growth: 1, pro: 2 };
+  if ((planRank[ctx.plan] ?? 0) < (planRank[requiredPlan] ?? 1)) {
+    return `This feature requires the ${requiredPlan} plan or higher`;
   }
   return null;
 }
 
+const PREBUILT_ITEMS = [
+  {
+    title: "Workers' Compensation Insurance",
+    description: "Verify workers' compensation insurance is current and covers all employees.",
+    category: "employment",
+    recurrence: "annually",
+    dueDate: null as string | null,
+  },
+  {
+    title: "Wage & Hour Compliance Audit",
+    description: "Review pay rates, overtime, and break policies comply with state labor law.",
+    category: "employment",
+    recurrence: "annually",
+    dueDate: null as string | null,
+  },
+  {
+    title: "Fire Extinguisher Inspection",
+    description: "Ensure all fire extinguishers are inspected, tagged, and within service date.",
+    category: "health_safety",
+    recurrence: "annually",
+    dueDate: null as string | null,
+  },
+  {
+    title: "First Aid Kit Restocking",
+    description: "Check and restock all first aid kits in the workplace.",
+    category: "health_safety",
+    recurrence: "quarterly",
+    dueDate: null as string | null,
+  },
+  {
+    title: "Business License Renewal",
+    description: "Renew the local business operating license before expiration.",
+    category: "licensing",
+    recurrence: "annually",
+    dueDate: null as string | null,
+  },
+  {
+    title: "Food Handler Certifications",
+    description: "Ensure all applicable staff hold valid food handler or food manager certifications.",
+    category: "licensing",
+    recurrence: "annually",
+    dueDate: null as string | null,
+  },
+  {
+    title: "Customer Data Review",
+    description: "Audit what personal customer data is collected, stored, and who has access.",
+    category: "data_privacy",
+    recurrence: "annually",
+    dueDate: null as string | null,
+  },
+];
+
+router.post("/compliance/initialize", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = getClerkUserId(req);
+  const ctx = await getWorkspaceContext(clerkId);
+  const authErr = requireOwnerWithPlan(ctx);
+  if (authErr) {
+    res.status(ctx ? 403 : 404).json({ error: authErr });
+    return;
+  }
+
+  const existing = await db
+    .select()
+    .from(complianceItemsTable)
+    .where(eq(complianceItemsTable.workspaceId, ctx!.workspaceId));
+
+  if (existing.length > 0) {
+    res.status(409).json({ error: "Compliance items already initialized" });
+    return;
+  }
+
+  const inserted = await db
+    .insert(complianceItemsTable)
+    .values(
+      PREBUILT_ITEMS.map((item) => ({
+        ...item,
+        workspaceId: ctx!.workspaceId,
+        status: "pending",
+      })),
+    )
+    .returning();
+
+  res.status(201).json(
+    inserted.map((item) => ({ ...item, status: computeStatus(item.dueDate, item.lastCompletedAt) })),
+  );
+});
+
 router.get("/compliance/items", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
   const ctx = await getWorkspaceContext(clerkId);
-
-  const authError = requireOwnerOrPlan(ctx, "growth");
-  if (authError) {
-    res.status(ctx ? 403 : 404).json({ error: authError });
+  const authErr = requireOwnerWithPlan(ctx);
+  if (authErr) {
+    res.status(ctx ? 403 : 404).json({ error: authErr });
     return;
   }
 
@@ -75,10 +162,9 @@ router.get("/compliance/items", requireAuth, async (req, res): Promise<void> => 
 router.post("/compliance/items", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
   const ctx = await getWorkspaceContext(clerkId);
-
-  const authError = requireOwnerOrPlan(ctx, "growth");
-  if (authError) {
-    res.status(ctx ? 403 : 404).json({ error: authError });
+  const authErr = requireOwnerWithPlan(ctx);
+  if (authErr) {
+    res.status(ctx ? 403 : 404).json({ error: authErr });
     return;
   }
 
@@ -105,10 +191,9 @@ router.post("/compliance/items", requireAuth, async (req, res): Promise<void> =>
 router.patch("/compliance/items/:itemId", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
   const ctx = await getWorkspaceContext(clerkId);
-
-  const authError = requireOwnerOrPlan(ctx, "growth");
-  if (authError) {
-    res.status(ctx ? 403 : 404).json({ error: authError });
+  const authErr = requireOwnerWithPlan(ctx);
+  if (authErr) {
+    res.status(ctx ? 403 : 404).json({ error: authErr });
     return;
   }
 
@@ -147,16 +232,20 @@ router.patch("/compliance/items/:itemId", requireAuth, async (req, res): Promise
     return;
   }
 
-  res.json(UpdateComplianceItemResponse.parse({ ...item, status: computeStatus(item.dueDate, item.lastCompletedAt) }));
+  res.json(
+    UpdateComplianceItemResponse.parse({
+      ...item,
+      status: computeStatus(item.dueDate, item.lastCompletedAt),
+    }),
+  );
 });
 
 router.delete("/compliance/items/:itemId", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
   const ctx = await getWorkspaceContext(clerkId);
-
-  const authError = requireOwnerOrPlan(ctx, "growth");
-  if (authError) {
-    res.status(ctx ? 403 : 404).json({ error: authError });
+  const authErr = requireOwnerWithPlan(ctx);
+  if (authErr) {
+    res.status(ctx ? 403 : 404).json({ error: authErr });
     return;
   }
 
@@ -181,10 +270,9 @@ router.delete("/compliance/items/:itemId", requireAuth, async (req, res): Promis
 router.post("/compliance/items/:itemId/complete", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
   const ctx = await getWorkspaceContext(clerkId);
-
-  const authError = requireOwnerOrPlan(ctx, "growth");
-  if (authError) {
-    res.status(ctx ? 403 : 404).json({ error: authError });
+  const authErr = requireOwnerWithPlan(ctx);
+  if (authErr) {
+    res.status(ctx ? 403 : 404).json({ error: authErr });
     return;
   }
 
@@ -252,10 +340,9 @@ router.post("/compliance/items/:itemId/complete", requireAuth, async (req, res):
 router.get("/compliance/audit-log", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
   const ctx = await getWorkspaceContext(clerkId);
-
-  const authError = requireOwnerOrPlan(ctx, "growth");
-  if (authError) {
-    res.status(ctx ? 403 : 404).json({ error: authError });
+  const authErr = requireOwnerWithPlan(ctx);
+  if (authErr) {
+    res.status(ctx ? 403 : 404).json({ error: authErr });
     return;
   }
 
@@ -270,7 +357,10 @@ router.get("/compliance/audit-log", requireAuth, async (req, res): Promise<void>
       completedAt: complianceCompletionsTable.completedAt,
     })
     .from(complianceCompletionsTable)
-    .innerJoin(complianceItemsTable, eq(complianceItemsTable.id, complianceCompletionsTable.complianceItemId))
+    .innerJoin(
+      complianceItemsTable,
+      eq(complianceItemsTable.id, complianceCompletionsTable.complianceItemId),
+    )
     .where(eq(complianceItemsTable.workspaceId, ctx!.workspaceId))
     .orderBy(desc(complianceCompletionsTable.completedAt));
 
