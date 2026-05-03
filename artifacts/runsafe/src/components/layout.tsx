@@ -25,7 +25,7 @@ export function Sidebar({ mobile = false, close = () => {} }: { mobile?: boolean
   const { user } = useUser();
   const { data: workspace } = useGetWorkspace({ query: { queryKey: getGetWorkspaceQueryKey() } });
 
-  const isOwner = !!workspace && workspace.ownerClerkId === user?.id;
+  const isOwner = workspace?.userRole === "owner";
   const navItems = isOwner ? OWNER_NAV : MEMBER_NAV;
 
   const handleSignOut = () => {

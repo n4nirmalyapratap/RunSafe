@@ -21,6 +21,8 @@ export const WorkspacePlan = {
   pro: "pro",
 } as const;
 
+export type WorkspaceUserRole = "owner" | "member";
+
 export interface Workspace {
   id: number;
   name: string;
@@ -33,6 +35,8 @@ export interface Workspace {
   plan: WorkspacePlan;
   ownerClerkId: string;
   createdAt: string;
+  /** Server-resolved role for the authenticated user in this workspace. */
+  userRole: WorkspaceUserRole;
 }
 
 export interface CreateWorkspaceBody {

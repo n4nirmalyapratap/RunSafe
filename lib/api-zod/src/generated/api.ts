@@ -26,6 +26,7 @@ export const GetWorkspaceResponse = zod.object({
   plan: zod.enum(["starter", "growth", "pro"]),
   ownerClerkId: zod.string(),
   createdAt: zod.coerce.date(),
+  userRole: zod.enum(["owner", "member"]),
 });
 
 /**

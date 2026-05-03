@@ -31,7 +31,7 @@ router.get("/workspace", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  res.json(GetWorkspaceResponse.parse(workspace));
+  res.json(GetWorkspaceResponse.parse({ ...workspace, userRole: ctx.role }));
 });
 
 router.post("/workspace", requireAuth, async (req, res): Promise<void> => {

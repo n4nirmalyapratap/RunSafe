@@ -83,11 +83,10 @@ function HomeRedirect() {
 }
 
 function useWorkspaceRole() {
-  const { user } = useUser();
   const { data: workspace, isLoading, error } = useGetWorkspace({
     query: { retry: false, queryKey: getGetWorkspaceQueryKey() },
   });
-  const isOwner = !!workspace && workspace.ownerClerkId === user?.id;
+  const isOwner = workspace?.userRole === "owner";
   return { workspace, isOwner, isLoading, error };
 }
 
