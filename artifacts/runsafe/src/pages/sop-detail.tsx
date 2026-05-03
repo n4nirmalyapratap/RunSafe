@@ -8,6 +8,7 @@ import {
   useGetTeamMembers,
   getGetTeamMembersQueryKey,
   useReorderSopSteps,
+  useUpdateSop,
 } from "@workspace/api-client-react";
 import type { SopDetail } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -50,10 +51,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import type { SopStep } from "@workspace/api-client-react";
+import { Textarea } from "@/components/ui/textarea";
+import { FileText, Save } from "lucide-react";
 
 interface SopAssignment {
   id: number;
@@ -162,9 +165,11 @@ export function SopDetail() {
   const addStep = useAddSopStep();
   const assignSop = useAssignSop();
   const reorderSteps = useReorderSopSteps();
+  const updateSop = useUpdateSop();
 
   const [stepOpen, setStepOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [notes, setNotes] = useState<string>("");
 
   const stepForm = useForm<z.infer<typeof stepSchema>>({
     resolver: zodResolver(stepSchema),
@@ -174,10 +179,27 @@ export function SopDetail() {
     resolver: zodResolver(assignSchema),
   });
 
+  useEffect(() => {
+    if (sop?.notes) setNotes(sop.notes);
+  }, [sop?.notes]);
+
   if (isLoading) return <AppLayout><Skeleton className="h-64" /></AppLayout>;
   if (!sop) return <AppLayout>SOP not found</AppLayout>;
 
   const assignments: SopAssignment[] = sop.assignments ?? [];
+
+  const handleSaveNotes = () => {
+    updateSop.mutate(
+      { sopId, data: { notes } },
+      {
+        onSuccess: () => {
+          toast({ title: "Notes saved" });
+          qc.invalidateQueries({ queryKey: getGetSopQueryKey(sopId) });
+        },
+        onError: () => toast({ title: "Failed to save notes", variant: "destructive" }),
+      },
+    );
+  };
 
   const handleReorder = (orderedIds: number[]) => {
     reorderSteps.mutate(
@@ -340,6 +362,25 @@ export function SopDetail() {
           </div>
 
           <DraggableStepList steps={sop.steps ?? []} onReorder={handleReorder} />
+        </div>
+
+        <div className="bg-card border rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-muted-foreground" />
+              <h2 className="text-xl font-semibold">File Notes</h2>
+            </div>
+            <Button size="sm" variant="outline" onClick={handleSaveNotes} disabled={updateSop.isPending}>
+              <Save className="h-4 w-4 mr-1" />
+              {updateSop.isPending ? "Saving…" : "Save Notes"}
+            </Button>
+          </div>
+          <Textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Add any reference notes, context, regulatory requirements, or links relevant to this SOP…"
+            className="min-h-[120px] resize-y"
+          />
         </div>
 
         <div className="bg-card border rounded-lg p-6">

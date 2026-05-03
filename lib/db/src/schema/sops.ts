@@ -7,6 +7,7 @@ export const sopsTable = pgTable("sops", {
   workspaceId: integer("workspace_id").notNull(),
   title: text("title").notNull(),
   description: text("description"),
+  notes: text("notes"),
   category: text("category"),
   createdByClerkId: text("created_by_clerk_id").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

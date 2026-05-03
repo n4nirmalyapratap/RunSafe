@@ -158,6 +158,8 @@ export interface SopDetail {
   /** @nullable */
   description?: string | null;
   /** @nullable */
+  notes?: string | null;
+  /** @nullable */
   category?: string | null;
   createdByClerkId: string;
   createdAt: string;
@@ -174,6 +176,7 @@ export interface CreateSopBody {
 export interface UpdateSopBody {
   title?: string;
   description?: string;
+  notes?: string;
   category?: string;
 }
 

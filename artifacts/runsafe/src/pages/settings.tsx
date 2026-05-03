@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 const settingsSchema = z.object({
   name: z.string().min(1, "Name is required"),
   industry: z.string().optional(),
+  state: z.string().optional(),
   employeeCount: z.coerce.number().min(1).optional(),
 });
 
@@ -32,7 +33,12 @@ export function Settings() {
 
   useEffect(() => {
     if (workspace) {
-      form.reset({ name: workspace.name, industry: workspace.industry || "", employeeCount: workspace.employeeCount || 1 });
+      form.reset({
+        name: workspace.name,
+        industry: workspace.industry || "",
+        state: workspace.state || "",
+        employeeCount: workspace.employeeCount || 1,
+      });
     }
   }, [workspace, form]);
 
@@ -65,12 +71,19 @@ export function Settings() {
                 )} />
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="industry" render={({ field }) => (
-                    <FormItem><FormLabel>Industry</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Industry</FormLabel><FormControl><Input placeholder="e.g. Food & Beverage" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
-                  <FormField control={form.control} name="employeeCount" render={({ field }) => (
-                    <FormItem><FormLabel>Employee Count</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormField control={form.control} name="state" render={({ field }) => (
+                    <FormItem><FormLabel>State / Province</FormLabel><FormControl><Input placeholder="e.g. CA" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                 </div>
+                <FormField control={form.control} name="employeeCount" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Number of Employees</FormLabel>
+                    <FormControl><Input type="number" min={1} {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
                 <Button type="submit" disabled={updateWorkspace.isPending}>Save Changes</Button>
               </form>
             </Form>

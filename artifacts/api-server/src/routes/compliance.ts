@@ -15,6 +15,9 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth, getClerkUserId } from "../middlewares/requireAuth";
 import { getWorkspaceContext } from "../lib/workspaceContext";
+import { createClerkClient } from "@clerk/express";
+
+const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
 const router: IRouter = Router();
 
@@ -305,6 +308,17 @@ router.post("/compliance/items/:itemId/complete", requireAuth, async (req, res):
 
   const completedAt = parsed.data.completedAt ? new Date(parsed.data.completedAt) : new Date();
 
+  let completedByName = "Team Member";
+  try {
+    const clerkUser = await clerk.users.getUser(clerkId);
+    const firstName = clerkUser.firstName ?? "";
+    const lastName = clerkUser.lastName ?? "";
+    const fullName = `${firstName} ${lastName}`.trim();
+    if (fullName) completedByName = fullName;
+  } catch {
+    // non-fatal — fall back to default
+  }
+
   await db
     .update(complianceItemsTable)
     .set({ lastCompletedAt: completedAt, status: "completed" })
@@ -325,7 +339,7 @@ router.post("/compliance/items/:itemId/complete", requireAuth, async (req, res):
     .values({
       complianceItemId: params.data.itemId,
       completedByClerkId: clerkId,
-      completedByName: "Team Member",
+      completedByName,
       notes: parsed.data.notes ?? null,
       completedAt,
     })

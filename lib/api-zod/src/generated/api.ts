@@ -156,6 +156,7 @@ export const GetSopResponse = zod.object({
   workspaceId: zod.number(),
   title: zod.string(),
   description: zod.string().nullish(),
+  notes: zod.string().nullish(),
   category: zod.string().nullish(),
   createdByClerkId: zod.string(),
   createdAt: zod.coerce.date(),
@@ -182,6 +183,7 @@ export const UpdateSopParams = zod.object({
 export const UpdateSopBody = zod.object({
   title: zod.string().optional(),
   description: zod.string().optional(),
+  notes: zod.string().optional(),
   category: zod.string().optional(),
 });
 
