@@ -158,7 +158,10 @@ function ClerkProviderWithRoutes() {
           <Route path="/sign-in/*?" component={SignInPage} />
           <Route path="/sign-up/*?" component={SignUpPage} />
 
-          <Route path="/onboarding"><Show when="signed-in"><Onboarding /></Show></Route>
+          <Route path="/onboarding">
+            <Show when="signed-in"><Onboarding /></Show>
+            <Show when="signed-out"><Redirect to="/" /></Show>
+          </Route>
 
           {/* Member-accessible routes */}
           <Route path="/dashboard"><ProtectedRoute component={Dashboard} /></Route>

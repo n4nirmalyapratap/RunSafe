@@ -108,7 +108,11 @@ router.patch("/tasks/:taskId", requireAuth, async (req, res): Promise<void> => {
           eq(taskAssignmentsTable.workspaceId, ctx.workspaceId),
         );
 
-  const updateData: Record<string, unknown> = { ...parsed.data };
+  // Members may only update `status` on their own tasks — not dueDate or notes
+  const updateData: Record<string, unknown> =
+    ctx.role === "member"
+      ? { status: parsed.data.status }
+      : { ...parsed.data };
   if (parsed.data.status === "completed") {
     updateData.completedAt = new Date();
   }
