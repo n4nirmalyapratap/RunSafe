@@ -18,7 +18,11 @@ router.get("/team", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
   const ctx = await getWorkspaceContext(clerkId);
   if (!ctx) {
-    res.json([]);
+    res.status(404).json({ error: "Workspace not found" });
+    return;
+  }
+  if (ctx.role !== "owner") {
+    res.status(403).json({ error: "Only workspace owners can view team members" });
     return;
   }
 
@@ -37,7 +41,6 @@ router.post("/team", requireAuth, async (req, res): Promise<void> => {
     res.status(404).json({ error: "Workspace not found" });
     return;
   }
-
   if (ctx.role !== "owner") {
     res.status(403).json({ error: "Only workspace owners can invite team members" });
     return;
@@ -70,7 +73,6 @@ router.patch("/team/:memberId", requireAuth, async (req, res): Promise<void> => 
     res.status(404).json({ error: "Workspace not found" });
     return;
   }
-
   if (ctx.role !== "owner") {
     res.status(403).json({ error: "Only workspace owners can update team members" });
     return;
@@ -114,7 +116,6 @@ router.delete("/team/:memberId", requireAuth, async (req, res): Promise<void> =>
     res.status(404).json({ error: "Workspace not found" });
     return;
   }
-
   if (ctx.role !== "owner") {
     res.status(403).json({ error: "Only workspace owners can remove team members" });
     return;

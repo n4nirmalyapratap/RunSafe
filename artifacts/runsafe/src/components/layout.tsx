@@ -3,19 +3,30 @@ import { User, FileText, CheckSquare, ShieldCheck, Users, Settings, LogOut, Menu
 import { useClerk, useUser } from "@clerk/react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useGetWorkspace, getGetWorkspaceQueryKey } from "@workspace/api-client-react";
+
+const OWNER_NAV = [
+  { href: "/dashboard", label: "Dashboard", icon: User },
+  { href: "/sops", label: "SOPs", icon: FileText },
+  { href: "/tasks", label: "Tasks", icon: CheckSquare },
+  { href: "/compliance", label: "Compliance", icon: ShieldCheck },
+  { href: "/team", label: "Team", icon: Users },
+  { href: "/settings", label: "Settings", icon: Settings },
+];
+
+const MEMBER_NAV = [
+  { href: "/dashboard", label: "Dashboard", icon: User },
+  { href: "/tasks", label: "My Tasks", icon: CheckSquare },
+];
 
 export function Sidebar({ mobile = false, close = () => {} }: { mobile?: boolean; close?: () => void }) {
   const [location] = useLocation();
   const { signOut } = useClerk();
-  
-  const navItems = [
-    { href: "/dashboard", label: "Dashboard", icon: User },
-    { href: "/sops", label: "SOPs", icon: FileText },
-    { href: "/tasks", label: "Tasks", icon: CheckSquare },
-    { href: "/compliance", label: "Compliance", icon: ShieldCheck },
-    { href: "/team", label: "Team", icon: Users },
-    { href: "/settings", label: "Settings", icon: Settings },
-  ];
+  const { user } = useUser();
+  const { data: workspace } = useGetWorkspace({ query: { queryKey: getGetWorkspaceQueryKey() } });
+
+  const isOwner = !!workspace && workspace.ownerClerkId === user?.id;
+  const navItems = isOwner ? OWNER_NAV : MEMBER_NAV;
 
   const handleSignOut = () => {
     signOut(() => { window.location.href = import.meta.env.BASE_URL; });
@@ -32,12 +43,12 @@ export function Sidebar({ mobile = false, close = () => {} }: { mobile?: boolean
         {navItems.map((item) => {
           const isActive = location === item.href || location.startsWith(`${item.href}/`);
           return (
-            <Link 
-              key={item.href} 
+            <Link
+              key={item.href}
               href={item.href}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
-                isActive 
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground" 
+                isActive
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
                   : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               }`}
               onClick={() => { if (mobile) close(); }}
@@ -49,7 +60,11 @@ export function Sidebar({ mobile = false, close = () => {} }: { mobile?: boolean
         })}
       </div>
       <div className="p-4 border-t border-sidebar-border">
-        <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground" onClick={handleSignOut}>
+        <Button
+          variant="ghost"
+          className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
+          onClick={handleSignOut}
+        >
           <LogOut className="h-5 w-5" />
           Sign Out
         </Button>
@@ -76,7 +91,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="p-0 w-64 border-none">
-                <Sidebar mobile close={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))} />
+                <Sidebar mobile close={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))} />
               </SheetContent>
             </Sheet>
             <div className="flex items-center gap-2">
@@ -85,7 +100,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <div className="hidden md:block text-sm font-medium text-muted-foreground">
-            Welcome back, {user?.firstName || 'Owner'}
+            Welcome back, {user?.firstName || "Owner"}
           </div>
         </header>
         <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">

@@ -31,13 +31,17 @@ router.get("/sops", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
   const ctx = await getWorkspaceContext(clerkId);
   if (!ctx) {
-    res.json([]);
+    res.status(404).json({ error: "Workspace not found" });
+    return;
+  }
+  if (ctx.role !== "owner") {
+    res.status(403).json({ error: "Only workspace owners can access the SOP library" });
     return;
   }
 
   const params = GetSopsQueryParams.safeParse(req.query);
 
-  const query = db
+  const sops = await db
     .select({
       id: sopsTable.id,
       workspaceId: sopsTable.workspaceId,
@@ -59,7 +63,6 @@ router.get("/sops", requireAuth, async (req, res): Promise<void> => {
     .groupBy(sopsTable.id)
     .orderBy(asc(sopsTable.createdAt));
 
-  const sops = await query;
   res.json(GetSopsResponse.parse(sops));
 });
 
@@ -70,7 +73,6 @@ router.post("/sops", requireAuth, async (req, res): Promise<void> => {
     res.status(404).json({ error: "Workspace not found" });
     return;
   }
-
   if (ctx.role !== "owner") {
     res.status(403).json({ error: "Only workspace owners can create SOPs" });
     return;
@@ -95,6 +97,10 @@ router.get("/sops/:sopId", requireAuth, async (req, res): Promise<void> => {
   const ctx = await getWorkspaceContext(clerkId);
   if (!ctx) {
     res.status(404).json({ error: "Workspace not found" });
+    return;
+  }
+  if (ctx.role !== "owner") {
+    res.status(403).json({ error: "Only workspace owners can access the SOP library" });
     return;
   }
 
@@ -134,7 +140,8 @@ router.get("/sops/:sopId", requireAuth, async (req, res): Promise<void> => {
     .where(eq(taskAssignmentsTable.sopId, sop.id))
     .orderBy(asc(taskAssignmentsTable.createdAt));
 
-  res.json(GetSopResponse.parse({ ...sop, steps, assignments }));
+  const baseParsed = GetSopResponse.parse({ ...sop, steps });
+  res.json({ ...baseParsed, assignments });
 });
 
 router.patch("/sops/:sopId", requireAuth, async (req, res): Promise<void> => {
@@ -144,7 +151,6 @@ router.patch("/sops/:sopId", requireAuth, async (req, res): Promise<void> => {
     res.status(404).json({ error: "Workspace not found" });
     return;
   }
-
   if (ctx.role !== "owner") {
     res.status(403).json({ error: "Only workspace owners can update SOPs" });
     return;
@@ -188,7 +194,6 @@ router.delete("/sops/:sopId", requireAuth, async (req, res): Promise<void> => {
     res.status(404).json({ error: "Workspace not found" });
     return;
   }
-
   if (ctx.role !== "owner") {
     res.status(403).json({ error: "Only workspace owners can delete SOPs" });
     return;
@@ -214,7 +219,6 @@ router.post("/sops/:sopId/steps", requireAuth, async (req, res): Promise<void> =
     res.status(404).json({ error: "Workspace not found" });
     return;
   }
-
   if (ctx.role !== "owner") {
     res.status(403).json({ error: "Only workspace owners can add SOP steps" });
     return;
@@ -264,7 +268,6 @@ router.put("/sops/:sopId/steps", requireAuth, async (req, res): Promise<void> =>
     res.status(404).json({ error: "Workspace not found" });
     return;
   }
-
   if (ctx.role !== "owner") {
     res.status(403).json({ error: "Only workspace owners can reorder SOP steps" });
     return;
@@ -313,7 +316,6 @@ router.patch("/sops/:sopId/steps/:stepId", requireAuth, async (req, res): Promis
     res.status(404).json({ error: "Workspace not found" });
     return;
   }
-
   if (ctx.role !== "owner") {
     res.status(403).json({ error: "Only workspace owners can update SOP steps" });
     return;
@@ -362,7 +364,6 @@ router.delete("/sops/:sopId/steps/:stepId", requireAuth, async (req, res): Promi
     res.status(404).json({ error: "Workspace not found" });
     return;
   }
-
   if (ctx.role !== "owner") {
     res.status(403).json({ error: "Only workspace owners can delete SOP steps" });
     return;
@@ -398,7 +399,6 @@ router.post("/sops/:sopId/assign", requireAuth, async (req, res): Promise<void> 
     res.status(404).json({ error: "Workspace not found" });
     return;
   }
-
   if (ctx.role !== "owner") {
     res.status(403).json({ error: "Only workspace owners can assign SOPs" });
     return;
@@ -444,6 +444,7 @@ router.post("/sops/:sopId/assign", requireAuth, async (req, res): Promise<void> 
   const assignDueDate = parsed.data.dueDate
     ? (parsed.data.dueDate as Date).toISOString().split("T")[0]
     : null;
+
   const [assignment] = await db
     .insert(taskAssignmentsTable)
     .values({
