@@ -20,7 +20,6 @@ import {
   SkipForward,
   Volume2,
   VolumeX,
-  X,
   RotateCcw,
 } from "lucide-react";
 import type { SopStep } from "@workspace/api-client-react";
@@ -304,19 +303,12 @@ export function SopVideoPlayer({
       <DialogContent className="max-w-4xl w-[95vw] max-h-[92vh] p-0 bg-slate-950 border-slate-800 text-white overflow-hidden flex flex-col gap-0">
         <DialogTitle className="sr-only">Training video for {sopTitle}</DialogTitle>
 
-        {/* Top bar */}
-        <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 border-b border-slate-800">
+        {/* Top bar — the Dialog provides its own close button in the top-right */}
+        <div className="flex-shrink-0 flex items-center px-5 py-3 border-b border-slate-800">
           <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-slate-400 font-medium">
             <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
             Training Mode
           </div>
-          <button
-            onClick={() => onOpenChange(false)}
-            className="text-slate-400 hover:text-white transition"
-            aria-label="Close"
-          >
-            <X className="h-5 w-5" />
-          </button>
         </div>
 
         {/* Slide stage */}
