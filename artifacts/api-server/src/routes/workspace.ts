@@ -54,7 +54,7 @@ router.post("/workspace", requireAuth, async (req, res): Promise<void> => {
     .values({ ...parsed.data, ownerClerkId: clerkId, plan: "starter" })
     .returning();
 
-  res.status(201).json(GetWorkspaceResponse.parse(workspace));
+  res.status(201).json(GetWorkspaceResponse.parse({ ...workspace, userRole: "owner" }));
 });
 
 router.patch("/workspace", requireAuth, async (req, res): Promise<void> => {
