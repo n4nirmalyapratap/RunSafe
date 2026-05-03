@@ -13,6 +13,14 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
+// Disable ETag generation for JSON API responses. With ETag enabled, Express
+// returns 304 Not Modified when the client sends If-None-Match — but the
+// browser does NOT auto-fill the response body, and our generated client
+// treats 304 as "no body" and returns null. That null then overwrites the
+// React Query cache (e.g. workspace data), making forms appear blank on
+// revisit even though the data still exists on the server.
+app.set("etag", false);
+
 app.use(
   pinoHttp({
     logger,

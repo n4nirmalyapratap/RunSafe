@@ -10,14 +10,13 @@ import {
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -35,31 +34,31 @@ export function Settings() {
   const qc = useQueryClient();
   const { toast } = useToast();
   const { data: workspace, isLoading } = useGetWorkspace({ query: { queryKey: getGetWorkspaceQueryKey() } });
-  const { data: meta } = useGetComplianceMeta({ query: { queryKey: getGetComplianceMetaQueryKey() } });
+  const { data: meta, isLoading: isMetaLoading } = useGetComplianceMeta({ query: { queryKey: getGetComplianceMetaQueryKey() } });
   const updateWorkspace = useUpdateWorkspace();
   const syncCompliance = useSyncComplianceFromCatalog();
 
+  // Use RHF's `values` prop to keep the form synced to server data. This is
+  // more reliable than form.reset in a useEffect because RHF re-syncs only
+  // when `values` actually changes by deep equality.
   const form = useForm<z.infer<typeof settingsSchema>>({
     resolver: zodResolver(settingsSchema),
     defaultValues: { name: "", industry: "", country: "", state: "", employeeCount: 1 },
+    values: workspace
+      ? {
+          name: workspace.name,
+          industry: workspace.industry || "",
+          country: workspace.country || "",
+          state: workspace.state || "",
+          employeeCount: workspace.employeeCount || 1,
+        }
+      : undefined,
   });
-
-  useEffect(() => {
-    if (workspace) {
-      form.reset({
-        name: workspace.name,
-        industry: workspace.industry || "",
-        country: workspace.country || "",
-        state: workspace.state || "",
-        employeeCount: workspace.employeeCount || 1,
-      });
-    }
-  }, [workspace, form]);
 
   const selectedCountry = form.watch("country");
   const states = meta?.countries.find((c) => c.code === selectedCountry)?.states ?? [];
 
-  if (isLoading) return <AppLayout><Skeleton className="h-64" /></AppLayout>;
+  if (isLoading || isMetaLoading) return <AppLayout><Skeleton className="h-64" /></AppLayout>;
 
   const handleSync = () => {
     syncCompliance.mutate(undefined, {
@@ -130,11 +129,12 @@ export function Settings() {
                       <FormItem>
                         <FormLabel>Country</FormLabel>
                         <Select
+                          key={`country-${meta?.countries.length ?? 0}-${field.value || "empty"}`}
                           onValueChange={(val) => {
                             field.onChange(val);
                             form.setValue("state", "");
                           }}
-                          value={field.value}
+                          value={field.value || undefined}
                         >
                           <FormControl>
                             <SelectTrigger>
@@ -161,8 +161,9 @@ export function Settings() {
                       <FormItem>
                         <FormLabel>State / Region</FormLabel>
                         <Select
+                          key={`state-${states.length}-${field.value || "empty"}`}
                           onValueChange={field.onChange}
-                          value={field.value}
+                          value={field.value || undefined}
                           disabled={states.length === 0}
                         >
                           <FormControl>
@@ -190,7 +191,11 @@ export function Settings() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Industry</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select
+                        key={`industry-${meta?.industries.length ?? 0}-${field.value || "empty"}`}
+                        onValueChange={field.onChange}
+                        value={field.value || undefined}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select industry" />
@@ -248,9 +253,9 @@ export function Settings() {
               {syncCompliance.isPending ? "Syncing..." : "Sync compliance checklist"}
             </Button>
             {workspace?.plan === "starter" && (
-              <FormDescription className="mt-2">
+              <p className="text-sm text-muted-foreground mt-2">
                 Upgrade to Growth or Pro to use Compliance Autopilot.
-              </FormDescription>
+              </p>
             )}
           </CardContent>
         </Card>
