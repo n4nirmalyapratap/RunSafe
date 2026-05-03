@@ -137,12 +137,45 @@ router.get("/dashboard/summary", requireAuth, async (req, res): Promise<void> =>
 
   let overdueCompliance = 0;
   let upcomingCompliance = 0;
+  const deadlineList: Array<{
+    id: number;
+    title: string;
+    category: string;
+    dueDate: string;
+    daysUntilDue: number;
+    status: "overdue" | "upcoming";
+  }> = [];
   for (const item of complianceItems) {
     if (!item.dueDate) continue;
+    if (item.lastCompletedAt) continue; // exclude already completed
     const due = new Date(item.dueDate);
-    if (due < now) overdueCompliance++;
-    else if (due <= thirtyDaysFromNow) upcomingCompliance++;
+    const days = Math.round((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (due < now) {
+      overdueCompliance++;
+      deadlineList.push({
+        id: item.id,
+        title: item.title,
+        category: item.category,
+        dueDate: item.dueDate,
+        daysUntilDue: days,
+        status: "overdue",
+      });
+    } else if (due <= thirtyDaysFromNow) {
+      upcomingCompliance++;
+      deadlineList.push({
+        id: item.id,
+        title: item.title,
+        category: item.category,
+        dueDate: item.dueDate,
+        daysUntilDue: days,
+        status: "upcoming",
+      });
+    }
   }
+  // Show the most urgent first (overdue, then soonest upcoming) — top 5
+  const upcomingComplianceDeadlines = deadlineList
+    .sort((a, b) => a.daysUntilDue - b.daysUntilDue)
+    .slice(0, 5);
 
   const recentCompletions = await db
     .select({
@@ -181,6 +214,7 @@ router.get("/dashboard/summary", requireAuth, async (req, res): Promise<void> =>
       upcomingComplianceItems: upcomingCompliance,
       teamMemberCount: teamCountResult?.count ?? 0,
       recentActivity,
+      upcomingComplianceDeadlines,
     }),
   );
 });

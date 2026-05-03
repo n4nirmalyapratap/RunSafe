@@ -11,6 +11,7 @@ export const complianceItemsTable = pgTable("compliance_items", {
   recurrence: text("recurrence").notNull().default("one_time"),
   dueDate: date("due_date"),
   lastCompletedAt: timestamp("last_completed_at", { withTimezone: true }),
+  lastReminderSentAt: timestamp("last_reminder_sent_at", { withTimezone: true }),
   status: text("status").notNull().default("pending"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

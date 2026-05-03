@@ -512,4 +512,14 @@ export const GetDashboardSummaryResponse = zod.object({
       createdAt: zod.coerce.date(),
     }),
   ),
+  upcomingComplianceDeadlines: zod.array(
+    zod.object({
+      id: zod.number(),
+      title: zod.string(),
+      category: zod.string(),
+      dueDate: zod.string(),
+      daysUntilDue: zod.number(),
+      status: zod.enum(["overdue", "upcoming"]),
+    }),
+  ).default([]),
 });

@@ -404,6 +404,15 @@ export interface ActivityItem {
   createdAt: string;
 }
 
+export interface UpcomingComplianceDeadline {
+  id: number;
+  title: string;
+  category: string;
+  dueDate: string;
+  daysUntilDue: number;
+  status: "overdue" | "upcoming";
+}
+
 export interface DashboardSummary {
   totalSops: number;
   totalTaskAssignments: number;
@@ -414,6 +423,7 @@ export interface DashboardSummary {
   upcomingComplianceItems: number;
   teamMemberCount: number;
   recentActivity: ActivityItem[];
+  upcomingComplianceDeadlines?: UpcomingComplianceDeadline[];
 }
 
 export type GetSopsParams = {

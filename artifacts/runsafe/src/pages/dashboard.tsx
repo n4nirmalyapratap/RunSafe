@@ -6,9 +6,11 @@ import {
   getGetWorkspaceQueryKey,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, CheckSquare, ShieldAlert, Users, Activity, AlertTriangle } from "lucide-react";
+import { FileText, CheckSquare, ShieldAlert, Activity, AlertTriangle, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Link } from "wouter";
 
 export function Dashboard() {
   const { data: summary, isLoading: summaryLoading } = useGetDashboardSummary({
@@ -102,6 +104,44 @@ export function Dashboard() {
             </>
           )}
         </div>
+
+        {isOwner && summary.upcomingComplianceDeadlines && summary.upcomingComplianceDeadlines.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Upcoming Compliance Deadlines
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {summary.upcomingComplianceDeadlines.map((d) => {
+                  const isOverdue = d.status === "overdue";
+                  const daysLabel = isOverdue
+                    ? `${Math.abs(d.daysUntilDue)} day${Math.abs(d.daysUntilDue) === 1 ? "" : "s"} overdue`
+                    : d.daysUntilDue === 0
+                      ? "Due today"
+                      : `Due in ${d.daysUntilDue} day${d.daysUntilDue === 1 ? "" : "s"}`;
+                  return (
+                    <Link key={d.id} href="/compliance">
+                      <div className="flex items-center justify-between gap-4 p-3 rounded-md border hover:bg-accent cursor-pointer">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{d.title}</p>
+                          <p className="text-xs text-muted-foreground capitalize">
+                            {d.category.replace(/_/g, " ")} • {format(new Date(d.dueDate), "MMM d, yyyy")}
+                          </p>
+                        </div>
+                        <Badge variant={isOverdue ? "destructive" : "secondary"} className="shrink-0">
+                          {daysLabel}
+                        </Badge>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>

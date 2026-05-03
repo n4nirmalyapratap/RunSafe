@@ -16,6 +16,7 @@ import {
 import { requireAuth, getClerkUserId } from "../middlewares/requireAuth";
 import { getWorkspaceContext } from "../lib/workspaceContext";
 import { createClerkClient } from "@clerk/express";
+import { runComplianceReminderScan } from "../lib/complianceReminders";
 
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
@@ -380,6 +381,20 @@ router.get("/compliance/audit-log", requireAuth, async (req, res): Promise<void>
     .orderBy(desc(complianceCompletionsTable.completedAt));
 
   res.json(GetComplianceAuditLogResponse.parse(entries));
+});
+
+// Manual trigger so an owner can run a reminder scan on demand
+// (useful for testing and immediate notifications). Owner-only.
+router.post("/compliance/reminders/run", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = getClerkUserId(req);
+  const ctx = await getWorkspaceContext(clerkId);
+  const authErr = requireOwnerWithPlan(ctx);
+  if (authErr) {
+    res.status(ctx ? 403 : 404).json({ error: authErr });
+    return;
+  }
+  const result = await runComplianceReminderScan();
+  res.json(result);
 });
 
 export default router;
