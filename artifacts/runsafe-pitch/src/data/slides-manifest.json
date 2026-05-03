@@ -1,1 +1,138 @@
-[]
+[
+  {
+    "id": "11111111-1111-1111-1111-111111111101",
+    "position": 1,
+    "filepath": "src/pages/slides/Title.tsx",
+    "title": "RunSafe",
+    "description": "Title slide with positioning statement.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "11111111-1111-1111-1111-111111111102",
+    "position": 2,
+    "filepath": "src/pages/slides/Problem.tsx",
+    "title": "The Problem",
+    "description": "SMB owners are operational bottlenecks.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "11111111-1111-1111-1111-111111111103",
+    "position": 3,
+    "filepath": "src/pages/slides/ProblemStats.tsx",
+    "title": "Why It Hurts",
+    "description": "Cost statistics for compliance gaps and ad-hoc ops.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "11111111-1111-1111-1111-111111111104",
+    "position": 4,
+    "filepath": "src/pages/slides/Solution.tsx",
+    "title": "The Solution",
+    "description": "Two products, one workspace.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "11111111-1111-1111-1111-111111111105",
+    "position": 5,
+    "filepath": "src/pages/slides/DelegationDivider.tsx",
+    "title": "Delegation OS",
+    "description": "Section divider for the Delegation OS product.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "11111111-1111-1111-1111-111111111106",
+    "position": 6,
+    "filepath": "src/pages/slides/SopsFeature.tsx",
+    "title": "SOPs",
+    "description": "How SOP authoring works in RunSafe.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "11111111-1111-1111-1111-111111111107",
+    "position": 7,
+    "filepath": "src/pages/slides/TasksFeature.tsx",
+    "title": "Tasks & Accountability",
+    "description": "Three-step delegation flow with member task isolation.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "11111111-1111-1111-1111-111111111108",
+    "position": 8,
+    "filepath": "src/pages/slides/ComplianceDivider.tsx",
+    "title": "Compliance Autopilot",
+    "description": "Section divider for the Compliance Autopilot product.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "11111111-1111-1111-1111-111111111109",
+    "position": 9,
+    "filepath": "src/pages/slides/ComplianceFeature.tsx",
+    "title": "Prebuilt Library",
+    "description": "Day-one regulatory coverage with prebuilt checklists.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "11111111-1111-1111-1111-111111111110",
+    "position": 10,
+    "filepath": "src/pages/slides/RemindersAudit.tsx",
+    "title": "Reminders & Audit",
+    "description": "Recurring resets, email reminders, and audit log.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "11111111-1111-1111-1111-111111111111",
+    "position": 11,
+    "filepath": "src/pages/slides/Dashboard.tsx",
+    "title": "Owner Dashboard",
+    "description": "The home screen owners actually open.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "11111111-1111-1111-1111-111111111112",
+    "position": 12,
+    "filepath": "src/pages/slides/Pricing.tsx",
+    "title": "Pricing",
+    "description": "Three tiers: Starter, Growth, Pro.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "11111111-1111-1111-1111-111111111113",
+    "position": 13,
+    "filepath": "src/pages/slides/Market.tsx",
+    "title": "Market",
+    "description": "TAM, SAM, SOM and target verticals.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "11111111-1111-1111-1111-111111111114",
+    "position": 14,
+    "filepath": "src/pages/slides/Differentiation.tsx",
+    "title": "Why Us",
+    "description": "Competitive comparison vs Asana and Trainual.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "11111111-1111-1111-1111-111111111115",
+    "position": 15,
+    "filepath": "src/pages/slides/Traction.tsx",
+    "title": "Pilot Traction",
+    "description": "Early signal from 32 design partners.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "11111111-1111-1111-1111-111111111116",
+    "position": 16,
+    "filepath": "src/pages/slides/Roadmap.tsx",
+    "title": "Roadmap",
+    "description": "What's shipping over the next four quarters.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "11111111-1111-1111-1111-111111111117",
+    "position": 17,
+    "filepath": "src/pages/slides/Ask.tsx",
+    "title": "The Ask",
+    "description": "Series Seed raise of $2.4M.",
+    "speakerNotes": ""
+  }
+]
