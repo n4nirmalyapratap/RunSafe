@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
-import { db, workspacesTable } from "@workspace/db";
+import { db, workspacesTable, complianceItemsTable } from "@workspace/db";
 import {
   GetWorkspaceResponse,
   CreateWorkspaceBody,
@@ -9,6 +9,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth, getClerkUserId } from "../middlewares/requireAuth";
 import { getWorkspaceContext } from "../lib/workspaceContext";
+import { resolveComplianceTemplates } from "../lib/complianceCatalog";
 
 const router: IRouter = Router();
 
@@ -53,6 +54,32 @@ router.post("/workspace", requireAuth, async (req, res): Promise<void> => {
     .insert(workspacesTable)
     .values({ ...parsed.data, ownerClerkId: clerkId, plan: "starter" })
     .returning();
+
+  // Auto-seed compliance items based on the workspace's country/state/industry.
+  // Best-effort: any failure here is non-fatal — the owner can re-seed from the
+  // Compliance page later.
+  try {
+    const templates = resolveComplianceTemplates({
+      country: workspace.country,
+      state: workspace.state,
+      industry: workspace.industry,
+    });
+    if (templates.length > 0) {
+      await db.insert(complianceItemsTable).values(
+        templates.map((t) => ({
+          workspaceId: workspace.id,
+          title: t.title,
+          description: t.description,
+          category: t.category,
+          recurrence: t.recurrence,
+          dueDate: t.dueDate ?? undefined,
+          status: "pending",
+        })),
+      );
+    }
+  } catch (err) {
+    console.error("[workspace] auto-seed compliance failed", err);
+  }
 
   res.status(201).json(GetWorkspaceResponse.parse({ ...workspace, userRole: "owner" }));
 });

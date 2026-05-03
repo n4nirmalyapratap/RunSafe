@@ -6,6 +6,7 @@ export const workspacesTable = pgTable("workspaces", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   industry: text("industry"),
+  country: text("country"),
   state: text("state"),
   employeeCount: integer("employee_count"),
   plan: text("plan").notNull().default("starter"),

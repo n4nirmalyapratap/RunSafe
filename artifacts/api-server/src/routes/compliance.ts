@@ -18,6 +18,7 @@ import { requireAuth, getClerkUserId } from "../middlewares/requireAuth";
 import { getWorkspaceContext } from "../lib/workspaceContext";
 import { createClerkClient } from "@clerk/express";
 import { runComplianceReminderScan } from "../lib/complianceReminders";
+import { resolveComplianceTemplates } from "../lib/complianceCatalog";
 
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
@@ -91,57 +92,6 @@ function requireOwnerWithPlan(
   return null;
 }
 
-const PREBUILT_ITEMS = [
-  {
-    title: "Workers' Compensation Insurance",
-    description: "Verify workers' compensation insurance is current and covers all employees.",
-    category: "employment",
-    recurrence: "annually",
-    dueDate: null as string | null,
-  },
-  {
-    title: "Wage & Hour Compliance Audit",
-    description: "Review pay rates, overtime, and break policies comply with state labor law.",
-    category: "employment",
-    recurrence: "annually",
-    dueDate: null as string | null,
-  },
-  {
-    title: "Fire Extinguisher Inspection",
-    description: "Ensure all fire extinguishers are inspected, tagged, and within service date.",
-    category: "health_safety",
-    recurrence: "annually",
-    dueDate: null as string | null,
-  },
-  {
-    title: "First Aid Kit Restocking",
-    description: "Check and restock all first aid kits in the workplace.",
-    category: "health_safety",
-    recurrence: "quarterly",
-    dueDate: null as string | null,
-  },
-  {
-    title: "Business License Renewal",
-    description: "Renew the local business operating license before expiration.",
-    category: "licensing",
-    recurrence: "annually",
-    dueDate: null as string | null,
-  },
-  {
-    title: "Food Handler Certifications",
-    description: "Ensure all applicable staff hold valid food handler or food manager certifications.",
-    category: "licensing",
-    recurrence: "annually",
-    dueDate: null as string | null,
-  },
-  {
-    title: "Customer Data Review",
-    description: "Audit what personal customer data is collected, stored, and who has access.",
-    category: "data_privacy",
-    recurrence: "annually",
-    dueDate: null as string | null,
-  },
-];
 
 router.post("/compliance/initialize", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
@@ -162,11 +112,32 @@ router.post("/compliance/initialize", requireAuth, async (req, res): Promise<voi
     return;
   }
 
+  // Resolve templates for this workspace's jurisdiction + industry
+  const [ws] = await db
+    .select()
+    .from(workspacesTable)
+    .where(eq(workspacesTable.id, ctx!.workspaceId));
+
+  const templates = resolveComplianceTemplates({
+    country: ws?.country ?? null,
+    state: ws?.state ?? null,
+    industry: ws?.industry ?? null,
+  });
+
+  if (templates.length === 0) {
+    res.status(500).json({ error: "Compliance catalog returned no items" });
+    return;
+  }
+
   const inserted = await db
     .insert(complianceItemsTable)
     .values(
-      PREBUILT_ITEMS.map((item) => ({
-        ...item,
+      templates.map((t) => ({
+        title: t.title,
+        description: t.description,
+        category: t.category,
+        recurrence: t.recurrence,
+        dueDate: t.dueDate ?? undefined,
         workspaceId: ctx!.workspaceId,
         status: "pending",
       })),

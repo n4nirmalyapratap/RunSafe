@@ -21,6 +21,7 @@ export const GetWorkspaceResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
   industry: zod.string().nullish(),
+  country: zod.string().nullish(),
   state: zod.string().nullish(),
   employeeCount: zod.number().nullish(),
   plan: zod.enum(["starter", "growth", "pro"]),
@@ -39,6 +40,7 @@ export const GetWorkspaceResponse = zod.object({
 export const CreateWorkspaceBody = zod.object({
   name: zod.string(),
   industry: zod.string().optional(),
+  country: zod.string().optional(),
   state: zod.string().optional(),
   employeeCount: zod.number().optional(),
 });
@@ -49,6 +51,7 @@ export const CreateWorkspaceBody = zod.object({
 export const UpdateWorkspaceBody = zod.object({
   name: zod.string().optional(),
   industry: zod.string().optional(),
+  country: zod.string().optional(),
   state: zod.string().optional(),
   employeeCount: zod.number().optional(),
   plan: zod.enum(["starter", "growth", "pro"]).optional(),
@@ -58,6 +61,7 @@ export const UpdateWorkspaceResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
   industry: zod.string().nullish(),
+  country: zod.string().nullish(),
   state: zod.string().nullish(),
   employeeCount: zod.number().nullish(),
   plan: zod.enum(["starter", "growth", "pro"]),

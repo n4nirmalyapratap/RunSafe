@@ -38,6 +38,8 @@ export interface Workspace {
   /** @nullable */
   industry?: string | null;
   /** @nullable */
+  country?: string | null;
+  /** @nullable */
   state?: string | null;
   /** @nullable */
   employeeCount?: number | null;
@@ -51,6 +53,7 @@ export interface Workspace {
 export interface CreateWorkspaceBody {
   name: string;
   industry?: string;
+  country?: string;
   state?: string;
   employeeCount?: number;
 }
@@ -67,6 +70,7 @@ export const UpdateWorkspaceBodyPlan = {
 export interface UpdateWorkspaceBody {
   name?: string;
   industry?: string;
+  country?: string;
   state?: string;
   employeeCount?: number;
   plan?: UpdateWorkspaceBodyPlan;

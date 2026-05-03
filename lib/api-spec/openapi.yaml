@@ -656,6 +656,8 @@ components:
           type: string
         industry:
           type: ["string", "null"]
+        country:
+          type: ["string", "null"]
         state:
           type: ["string", "null"]
         employeeCount:
@@ -687,6 +689,8 @@ components:
           type: string
         industry:
           type: string
+        country:
+          type: string
         state:
           type: string
         employeeCount:
@@ -700,6 +704,8 @@ components:
         name:
           type: string
         industry:
+          type: string
+        country:
           type: string
         state:
           type: string

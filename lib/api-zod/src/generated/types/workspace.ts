@@ -14,6 +14,8 @@ export interface Workspace {
   /** @nullable */
   industry?: string | null;
   /** @nullable */
+  country?: string | null;
+  /** @nullable */
   state?: string | null;
   /** @nullable */
   employeeCount?: number | null;

@@ -9,6 +9,7 @@
 export interface CreateWorkspaceBody {
   name: string;
   industry?: string;
+  country?: string;
   state?: string;
   employeeCount?: number;
 }

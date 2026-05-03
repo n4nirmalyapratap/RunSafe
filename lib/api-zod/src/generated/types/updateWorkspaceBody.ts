@@ -10,6 +10,7 @@ import type { UpdateWorkspaceBodyPlan } from "./updateWorkspaceBodyPlan";
 export interface UpdateWorkspaceBody {
   name?: string;
   industry?: string;
+  country?: string;
   state?: string;
   employeeCount?: number;
   plan?: UpdateWorkspaceBodyPlan;
