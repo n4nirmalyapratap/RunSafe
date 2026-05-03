@@ -473,6 +473,7 @@ export const GetComplianceItemsResponseItem = zod.object({
     "health_safety",
     "data_privacy",
     "licensing",
+    "tax",
     "other",
   ]),
   recurrence: zod.enum(["one_time", "monthly", "quarterly", "annually"]),
@@ -496,6 +497,7 @@ export const CreateComplianceItemBody = zod.object({
     "health_safety",
     "data_privacy",
     "licensing",
+    "tax",
     "other",
   ]),
   recurrence: zod.enum(["one_time", "monthly", "quarterly", "annually"]),
@@ -513,7 +515,14 @@ export const UpdateComplianceItemBody = zod.object({
   title: zod.string().optional(),
   description: zod.string().optional(),
   category: zod
-    .enum(["employment", "health_safety", "data_privacy", "licensing", "other"])
+    .enum([
+      "employment",
+      "health_safety",
+      "data_privacy",
+      "licensing",
+      "tax",
+      "other",
+    ])
     .optional(),
   recurrence: zod
     .enum(["one_time", "monthly", "quarterly", "annually"])
@@ -531,6 +540,7 @@ export const UpdateComplianceItemResponse = zod.object({
     "health_safety",
     "data_privacy",
     "licensing",
+    "tax",
     "other",
   ]),
   recurrence: zod.enum(["one_time", "monthly", "quarterly", "annually"]),

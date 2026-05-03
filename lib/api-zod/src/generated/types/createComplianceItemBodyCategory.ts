@@ -14,5 +14,6 @@ export const CreateComplianceItemBodyCategory = {
   health_safety: "health_safety",
   data_privacy: "data_privacy",
   licensing: "licensing",
+  tax: "tax",
   other: "other",
 } as const;

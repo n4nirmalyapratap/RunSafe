@@ -1177,7 +1177,7 @@ components:
           type: ["string", "null"]
         category:
           type: string
-          enum: [employment, health_safety, data_privacy, licensing, other]
+          enum: [employment, health_safety, data_privacy, licensing, tax, other]
         recurrence:
           type: string
           enum: [one_time, monthly, quarterly, annually]
@@ -1211,7 +1211,7 @@ components:
           type: string
         category:
           type: string
-          enum: [employment, health_safety, data_privacy, licensing, other]
+          enum: [employment, health_safety, data_privacy, licensing, tax, other]
         recurrence:
           type: string
           enum: [one_time, monthly, quarterly, annually]
@@ -1232,7 +1232,7 @@ components:
           type: string
         category:
           type: string
-          enum: [employment, health_safety, data_privacy, licensing, other]
+          enum: [employment, health_safety, data_privacy, licensing, tax, other]
         recurrence:
           type: string
           enum: [one_time, monthly, quarterly, annually]
