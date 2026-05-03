@@ -530,6 +530,416 @@ export interface DashboardSummary {
   upcomingComplianceDeadlines?: UpcomingComplianceDeadline[];
 }
 
+export interface SecurityModuleScore {
+  /** 0-100 subscore for this module */
+  score: number;
+  label: string;
+  detail: string;
+}
+
+export type SecuritySummaryModules = {
+  breach: SecurityModuleScore;
+  training: SecurityModuleScore;
+  phishing: SecurityModuleScore;
+  password: SecurityModuleScore;
+  vendors: SecurityModuleScore;
+  devices: SecurityModuleScore;
+};
+
+export type SecuritySummaryCounts = {
+  openIncidents: number;
+  totalBreaches: number;
+  membersTrained: number;
+  totalMembers: number;
+  totalVendors: number;
+  totalDevices: number;
+  mfaDevices: number;
+};
+
+export interface SecuritySummary {
+  /** Weighted overall security posture (0-100) */
+  postureScore: number;
+  modules: SecuritySummaryModules;
+  counts: SecuritySummaryCounts;
+}
+
+export type SecurityBreachCheckBreachesItem = {
+  name: string;
+  /** @nullable */
+  date?: string | null;
+  dataClasses: string[];
+};
+
+export interface SecurityBreachCheck {
+  id: number;
+  memberId: number;
+  memberName: string;
+  email: string;
+  breachCount: number;
+  breaches: SecurityBreachCheckBreachesItem[];
+  checkedAt: string;
+}
+
+export type PhishingTemplateDifficulty =
+  (typeof PhishingTemplateDifficulty)[keyof typeof PhishingTemplateDifficulty];
+
+export const PhishingTemplateDifficulty = {
+  easy: "easy",
+  medium: "medium",
+  hard: "hard",
+} as const;
+
+export interface PhishingTemplate {
+  key: string;
+  name: string;
+  difficulty: PhishingTemplateDifficulty;
+  subject: string;
+  previewBody: string;
+  landingTeach: string;
+  redFlags: string[];
+}
+
+export interface PhishingCampaignSummary {
+  id: number;
+  name: string;
+  templateKey: string;
+  templateName: string;
+  recipientCount: number;
+  clickCount: number;
+  reportCount: number;
+  createdAt: string;
+}
+
+export interface PhishingResult {
+  id: number;
+  memberId: number;
+  memberName: string;
+  memberEmail: string;
+  token: string;
+  link: string;
+  /** @nullable */
+  clickedAt?: string | null;
+  /** @nullable */
+  reportedAt?: string | null;
+}
+
+export interface PhishingCampaignDetail {
+  id: number;
+  name: string;
+  templateKey: string;
+  template: PhishingTemplate;
+  createdAt: string;
+  results: PhishingResult[];
+}
+
+export interface CreatePhishingCampaignBody {
+  name: string;
+  templateKey: string;
+  /** @minItems 1 */
+  recipientMemberIds: number[];
+}
+
+export interface TrainingLessonSummary {
+  id: number;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  category: string;
+  durationMinutes: number;
+  completedByMe: boolean;
+  completionCount: number;
+  totalMembers: number;
+}
+
+export type TrainingLessonDetailStepsItem = {
+  title: string;
+  body: string;
+};
+
+export type TrainingLessonDetailQuizItem = {
+  q: string;
+  choices: string[];
+  answerIdx: number;
+};
+
+export interface TrainingLessonDetail {
+  id: number;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  category: string;
+  durationMinutes: number;
+  steps: TrainingLessonDetailStepsItem[];
+  quiz: TrainingLessonDetailQuizItem[];
+  completedByMe: boolean;
+  /** @nullable */
+  myScore?: number | null;
+}
+
+export interface CompleteTrainingLessonBody {
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  score: number;
+}
+
+export interface TrainingCompletion {
+  id: number;
+  lessonId: number;
+  memberId: number;
+  score: number;
+  completedAt: string;
+}
+
+export interface PasswordAttestation {
+  id: number;
+  memberId: number;
+  memberName: string;
+  usesManager: boolean;
+  length12Plus: boolean;
+  uniquePerSite: boolean;
+  mfaEverywhere: boolean;
+  score: number;
+  attestedAt: string;
+}
+
+export interface UpsertPasswordAttestationBody {
+  usesManager: boolean;
+  length12Plus: boolean;
+  uniquePerSite: boolean;
+  mfaEverywhere: boolean;
+}
+
+export type PlaybookSummarySeverity =
+  (typeof PlaybookSummarySeverity)[keyof typeof PlaybookSummarySeverity];
+
+export const PlaybookSummarySeverity = {
+  low: "low",
+  medium: "medium",
+  high: "high",
+  critical: "critical",
+} as const;
+
+export interface PlaybookSummary {
+  id: number;
+  title: string;
+  category: string;
+  severity: PlaybookSummarySeverity;
+  /** @nullable */
+  description?: string | null;
+  stepCount: number;
+}
+
+export type PlaybookDetailSeverity =
+  (typeof PlaybookDetailSeverity)[keyof typeof PlaybookDetailSeverity];
+
+export const PlaybookDetailSeverity = {
+  low: "low",
+  medium: "medium",
+  high: "high",
+  critical: "critical",
+} as const;
+
+export type PlaybookDetailStepsItem = {
+  title: string;
+  detail: string;
+};
+
+export interface PlaybookDetail {
+  id: number;
+  title: string;
+  category: string;
+  severity: PlaybookDetailSeverity;
+  /** @nullable */
+  description?: string | null;
+  steps: PlaybookDetailStepsItem[];
+}
+
+export type IncidentPlaybookSeverity =
+  (typeof IncidentPlaybookSeverity)[keyof typeof IncidentPlaybookSeverity];
+
+export const IncidentPlaybookSeverity = {
+  low: "low",
+  medium: "medium",
+  high: "high",
+  critical: "critical",
+} as const;
+
+export type IncidentStatus =
+  (typeof IncidentStatus)[keyof typeof IncidentStatus];
+
+export const IncidentStatus = {
+  open: "open",
+  resolved: "resolved",
+} as const;
+
+export interface Incident {
+  id: number;
+  playbookId: number;
+  playbookTitle: string;
+  playbookSeverity: IncidentPlaybookSeverity;
+  title: string;
+  status: IncidentStatus;
+  openedByName: string;
+  /** @nullable */
+  notes?: string | null;
+  completedStepIndices: number[];
+  openedAt: string;
+  /** @nullable */
+  resolvedAt?: string | null;
+}
+
+export interface CreateIncidentBody {
+  playbookId: number;
+  title: string;
+  notes?: string;
+}
+
+export type UpdateIncidentBodyStatus =
+  (typeof UpdateIncidentBodyStatus)[keyof typeof UpdateIncidentBodyStatus];
+
+export const UpdateIncidentBodyStatus = {
+  open: "open",
+  resolved: "resolved",
+} as const;
+
+export interface UpdateIncidentBody {
+  status?: UpdateIncidentBodyStatus;
+  notes?: string;
+  completedStepIndices?: number[];
+}
+
+export type VendorDataAccess =
+  (typeof VendorDataAccess)[keyof typeof VendorDataAccess];
+
+export const VendorDataAccess = {
+  low: "low",
+  medium: "medium",
+  high: "high",
+  critical: "critical",
+} as const;
+
+export interface Vendor {
+  id: number;
+  name: string;
+  category: string;
+  dataAccess: VendorDataAccess;
+  hasMfa: boolean;
+  hasSso: boolean;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  lastReviewedAt?: string | null;
+  createdAt: string;
+}
+
+export type CreateVendorBodyDataAccess =
+  (typeof CreateVendorBodyDataAccess)[keyof typeof CreateVendorBodyDataAccess];
+
+export const CreateVendorBodyDataAccess = {
+  low: "low",
+  medium: "medium",
+  high: "high",
+  critical: "critical",
+} as const;
+
+export interface CreateVendorBody {
+  name: string;
+  category?: string;
+  dataAccess: CreateVendorBodyDataAccess;
+  hasMfa?: boolean;
+  hasSso?: boolean;
+  notes?: string;
+}
+
+export type UpdateVendorBodyDataAccess =
+  (typeof UpdateVendorBodyDataAccess)[keyof typeof UpdateVendorBodyDataAccess];
+
+export const UpdateVendorBodyDataAccess = {
+  low: "low",
+  medium: "medium",
+  high: "high",
+  critical: "critical",
+} as const;
+
+export interface UpdateVendorBody {
+  name?: string;
+  category?: string;
+  dataAccess?: UpdateVendorBodyDataAccess;
+  hasMfa?: boolean;
+  hasSso?: boolean;
+  notes?: string;
+  markReviewed?: boolean;
+}
+
+export type DeviceType = (typeof DeviceType)[keyof typeof DeviceType];
+
+export const DeviceType = {
+  laptop: "laptop",
+  phone: "phone",
+  tablet: "tablet",
+  desktop: "desktop",
+} as const;
+
+export interface Device {
+  id: number;
+  memberId: number;
+  memberName: string;
+  name: string;
+  type: DeviceType;
+  /** @nullable */
+  os?: string | null;
+  mfaEnabled: boolean;
+  diskEncrypted: boolean;
+  autoUpdates: boolean;
+  /** @nullable */
+  notes?: string | null;
+  updatedAt: string;
+}
+
+export type CreateDeviceBodyType =
+  (typeof CreateDeviceBodyType)[keyof typeof CreateDeviceBodyType];
+
+export const CreateDeviceBodyType = {
+  laptop: "laptop",
+  phone: "phone",
+  tablet: "tablet",
+  desktop: "desktop",
+} as const;
+
+export interface CreateDeviceBody {
+  name: string;
+  type: CreateDeviceBodyType;
+  os?: string;
+  mfaEnabled?: boolean;
+  diskEncrypted?: boolean;
+  autoUpdates?: boolean;
+  notes?: string;
+  /** Owner-only — assign device to another member */
+  memberId?: number;
+}
+
+export type UpdateDeviceBodyType =
+  (typeof UpdateDeviceBodyType)[keyof typeof UpdateDeviceBodyType];
+
+export const UpdateDeviceBodyType = {
+  laptop: "laptop",
+  phone: "phone",
+  tablet: "tablet",
+  desktop: "desktop",
+} as const;
+
+export interface UpdateDeviceBody {
+  name?: string;
+  type?: UpdateDeviceBodyType;
+  os?: string;
+  mfaEnabled?: boolean;
+  diskEncrypted?: boolean;
+  autoUpdates?: boolean;
+  notes?: string;
+}
+
 export type GetSopsParams = {
   category?: string;
 };

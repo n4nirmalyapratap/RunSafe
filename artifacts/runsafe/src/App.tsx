@@ -26,6 +26,15 @@ import { Compliance } from "@/pages/compliance";
 import { Team } from "@/pages/team";
 import { Settings } from "@/pages/settings";
 import { Onboarding } from "@/pages/onboarding";
+import { SecurityOverview } from "@/pages/security/overview";
+import { SecurityBreaches } from "@/pages/security/breaches";
+import { SecurityPhishing } from "@/pages/security/phishing";
+import { SecurityTraining } from "@/pages/security/training";
+import { SecurityPasswords } from "@/pages/security/passwords";
+import { SecurityPlaybooks } from "@/pages/security/playbooks";
+import { SecurityVendors } from "@/pages/security/vendors";
+import { SecurityDevices } from "@/pages/security/devices";
+import { PhishingCaught } from "@/pages/security/phishing-caught";
 
 const clerkPubKey = publishableKeyFromHost(
   window.location.hostname,
@@ -193,6 +202,9 @@ function ClerkProviderWithRoutes() {
           <Route path="/sign-in/*?" component={SignInPage} />
           <Route path="/sign-up/*?" component={SignUpPage} />
 
+          {/* Public phishing-caught landing — unauthenticated, by design */}
+          <Route path="/phishing-caught/:token" component={PhishingCaught} />
+
           <Route path="/onboarding">
             <Show when="signed-in"><Onboarding /></Show>
             <Show when="signed-out"><Redirect to="/" /></Show>
@@ -203,10 +215,20 @@ function ClerkProviderWithRoutes() {
           <Route path="/tasks"><ProtectedRoute component={Tasks} /></Route>
           <Route path="/tasks/:taskId"><ProtectedRoute component={TaskDetail} /></Route>
 
+          {/* Security: training/passwords/devices are member-accessible */}
+          <Route path="/security/training"><ProtectedRoute component={SecurityTraining} /></Route>
+          <Route path="/security/passwords"><ProtectedRoute component={SecurityPasswords} /></Route>
+          <Route path="/security/devices"><ProtectedRoute component={SecurityDevices} /></Route>
+
           {/* Owner-only routes — members redirected to /dashboard */}
           <Route path="/sops"><OwnerRoute component={Sops} /></Route>
           <Route path="/sops/:sopId"><OwnerRoute component={SopDetail} /></Route>
           <Route path="/compliance"><OwnerRoute component={Compliance} /></Route>
+          <Route path="/security"><OwnerRoute component={SecurityOverview} /></Route>
+          <Route path="/security/breaches"><OwnerRoute component={SecurityBreaches} /></Route>
+          <Route path="/security/phishing"><OwnerRoute component={SecurityPhishing} /></Route>
+          <Route path="/security/playbooks"><OwnerRoute component={SecurityPlaybooks} /></Route>
+          <Route path="/security/vendors"><OwnerRoute component={SecurityVendors} /></Route>
           <Route path="/team"><OwnerRoute component={Team} /></Route>
           <Route path="/settings"><OwnerRoute component={Settings} /></Route>
 

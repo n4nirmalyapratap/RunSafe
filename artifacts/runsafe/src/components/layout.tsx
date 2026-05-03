@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { User, FileText, CheckSquare, ShieldCheck, Users, Settings, LogOut, Menu } from "lucide-react";
+import { User, FileText, CheckSquare, ShieldCheck, Shield, Users, Settings, LogOut, Menu } from "lucide-react";
 import { useClerk, useUser } from "@clerk/react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -15,6 +15,7 @@ const OWNER_NAV = [
   { href: "/sops", label: "SOPs", icon: FileText },
   { href: "/tasks", label: "Tasks", icon: CheckSquare },
   { href: "/compliance", label: "Compliance", icon: ShieldCheck },
+  { href: "/security", label: "Security", icon: Shield },
   { href: "/team", label: "Team", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

@@ -637,3 +637,526 @@ export const GetDashboardSummaryResponse = zod.object({
     )
     .default(getDashboardSummaryResponseUpcomingComplianceDeadlinesDefault),
 });
+
+/**
+ * @summary Overall security posture score + module subscores
+ */
+export const GetSecuritySummaryResponse = zod.object({
+  postureScore: zod
+    .number()
+    .describe("Weighted overall security posture (0-100)"),
+  modules: zod.object({
+    breach: zod.object({
+      score: zod.number().describe("0-100 subscore for this module"),
+      label: zod.string(),
+      detail: zod.string(),
+    }),
+    training: zod.object({
+      score: zod.number().describe("0-100 subscore for this module"),
+      label: zod.string(),
+      detail: zod.string(),
+    }),
+    phishing: zod.object({
+      score: zod.number().describe("0-100 subscore for this module"),
+      label: zod.string(),
+      detail: zod.string(),
+    }),
+    password: zod.object({
+      score: zod.number().describe("0-100 subscore for this module"),
+      label: zod.string(),
+      detail: zod.string(),
+    }),
+    vendors: zod.object({
+      score: zod.number().describe("0-100 subscore for this module"),
+      label: zod.string(),
+      detail: zod.string(),
+    }),
+    devices: zod.object({
+      score: zod.number().describe("0-100 subscore for this module"),
+      label: zod.string(),
+      detail: zod.string(),
+    }),
+  }),
+  counts: zod.object({
+    openIncidents: zod.number(),
+    totalBreaches: zod.number(),
+    membersTrained: zod.number(),
+    totalMembers: zod.number(),
+    totalVendors: zod.number(),
+    totalDevices: zod.number(),
+    mfaDevices: zod.number(),
+  }),
+});
+
+/**
+ * @summary List the most recent breach scan for every team member
+ */
+export const GetSecurityBreachChecksResponseItem = zod.object({
+  id: zod.number(),
+  memberId: zod.number(),
+  memberName: zod.string(),
+  email: zod.string(),
+  breachCount: zod.number(),
+  breaches: zod.array(
+    zod.object({
+      name: zod.string(),
+      date: zod.string().nullish(),
+      dataClasses: zod.array(zod.string()),
+    }),
+  ),
+  checkedAt: zod.coerce.date(),
+});
+export const GetSecurityBreachChecksResponse = zod.array(
+  GetSecurityBreachChecksResponseItem,
+);
+
+/**
+ * @summary Re-query the public breach API for one member's email
+ */
+export const RefreshSecurityBreachCheckParams = zod.object({
+  memberId: zod.coerce.number(),
+});
+
+export const RefreshSecurityBreachCheckResponse = zod.object({
+  id: zod.number(),
+  memberId: zod.number(),
+  memberName: zod.string(),
+  email: zod.string(),
+  breachCount: zod.number(),
+  breaches: zod.array(
+    zod.object({
+      name: zod.string(),
+      date: zod.string().nullish(),
+      dataClasses: zod.array(zod.string()),
+    }),
+  ),
+  checkedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List built-in phishing email templates
+ */
+export const GetPhishingTemplatesResponseItem = zod.object({
+  key: zod.string(),
+  name: zod.string(),
+  difficulty: zod.enum(["easy", "medium", "hard"]),
+  subject: zod.string(),
+  previewBody: zod.string(),
+  landingTeach: zod.string(),
+  redFlags: zod.array(zod.string()),
+});
+export const GetPhishingTemplatesResponse = zod.array(
+  GetPhishingTemplatesResponseItem,
+);
+
+/**
+ * @summary List phishing simulation campaigns with summary stats
+ */
+export const GetPhishingCampaignsResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  templateKey: zod.string(),
+  templateName: zod.string(),
+  recipientCount: zod.number(),
+  clickCount: zod.number(),
+  reportCount: zod.number(),
+  createdAt: zod.coerce.date(),
+});
+export const GetPhishingCampaignsResponse = zod.array(
+  GetPhishingCampaignsResponseItem,
+);
+
+/**
+ * @summary Create a new phishing simulation campaign
+ */
+
+export const CreatePhishingCampaignBody = zod.object({
+  name: zod.string(),
+  templateKey: zod.string(),
+  recipientMemberIds: zod.array(zod.number()).min(1),
+});
+
+/**
+ * @summary Campaign detail with per-recipient tracking links + status
+ */
+export const GetPhishingCampaignParams = zod.object({
+  campaignId: zod.coerce.number(),
+});
+
+export const GetPhishingCampaignResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  templateKey: zod.string(),
+  template: zod.object({
+    key: zod.string(),
+    name: zod.string(),
+    difficulty: zod.enum(["easy", "medium", "hard"]),
+    subject: zod.string(),
+    previewBody: zod.string(),
+    landingTeach: zod.string(),
+    redFlags: zod.array(zod.string()),
+  }),
+  createdAt: zod.coerce.date(),
+  results: zod.array(
+    zod.object({
+      id: zod.number(),
+      memberId: zod.number(),
+      memberName: zod.string(),
+      memberEmail: zod.string(),
+      token: zod.string(),
+      link: zod.string(),
+      clickedAt: zod.coerce.date().nullish(),
+      reportedAt: zod.coerce.date().nullish(),
+    }),
+  ),
+});
+
+/**
+ * @summary Delete a campaign (and its tracking links)
+ */
+export const DeletePhishingCampaignParams = zod.object({
+  campaignId: zod.coerce.number(),
+});
+
+/**
+ * @summary List training lessons (seeds catalog on first call)
+ */
+export const GetTrainingLessonsResponseItem = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  category: zod.string(),
+  durationMinutes: zod.number(),
+  completedByMe: zod.boolean(),
+  completionCount: zod.number(),
+  totalMembers: zod.number(),
+});
+export const GetTrainingLessonsResponse = zod.array(
+  GetTrainingLessonsResponseItem,
+);
+
+/**
+ * @summary Get a lesson's full content (steps + quiz)
+ */
+export const GetTrainingLessonParams = zod.object({
+  lessonId: zod.coerce.number(),
+});
+
+export const GetTrainingLessonResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  category: zod.string(),
+  durationMinutes: zod.number(),
+  steps: zod.array(
+    zod.object({
+      title: zod.string(),
+      body: zod.string(),
+    }),
+  ),
+  quiz: zod.array(
+    zod.object({
+      q: zod.string(),
+      choices: zod.array(zod.string()),
+      answerIdx: zod.number(),
+    }),
+  ),
+  completedByMe: zod.boolean(),
+  myScore: zod.number().nullish(),
+});
+
+/**
+ * @summary Record a quiz completion for the current user
+ */
+export const CompleteTrainingLessonParams = zod.object({
+  lessonId: zod.coerce.number(),
+});
+
+export const completeTrainingLessonBodyScoreMin = 0;
+export const completeTrainingLessonBodyScoreMax = 100;
+
+export const CompleteTrainingLessonBody = zod.object({
+  score: zod
+    .number()
+    .min(completeTrainingLessonBodyScoreMin)
+    .max(completeTrainingLessonBodyScoreMax),
+});
+
+export const CompleteTrainingLessonResponse = zod.object({
+  id: zod.number(),
+  lessonId: zod.number(),
+  memberId: zod.number(),
+  score: zod.number(),
+  completedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary All team password-hygiene attestations (owner only)
+ */
+export const GetPasswordAttestationsResponseItem = zod.object({
+  id: zod.number(),
+  memberId: zod.number(),
+  memberName: zod.string(),
+  usesManager: zod.boolean(),
+  length12Plus: zod.boolean(),
+  uniquePerSite: zod.boolean(),
+  mfaEverywhere: zod.boolean(),
+  score: zod.number(),
+  attestedAt: zod.coerce.date(),
+});
+export const GetPasswordAttestationsResponse = zod.array(
+  GetPasswordAttestationsResponseItem,
+);
+
+/**
+ * @summary Current user's attestation (or null)
+ */
+export const GetMyPasswordAttestationResponse = zod.union([
+  zod.null(),
+  zod.object({
+    id: zod.number(),
+    memberId: zod.number(),
+    memberName: zod.string(),
+    usesManager: zod.boolean(),
+    length12Plus: zod.boolean(),
+    uniquePerSite: zod.boolean(),
+    mfaEverywhere: zod.boolean(),
+    score: zod.number(),
+    attestedAt: zod.coerce.date(),
+  }),
+]);
+
+/**
+ * @summary Submit / update current user's password-hygiene attestation
+ */
+export const UpsertMyPasswordAttestationBody = zod.object({
+  usesManager: zod.boolean(),
+  length12Plus: zod.boolean(),
+  uniquePerSite: zod.boolean(),
+  mfaEverywhere: zod.boolean(),
+});
+
+export const UpsertMyPasswordAttestationResponse = zod.object({
+  id: zod.number(),
+  memberId: zod.number(),
+  memberName: zod.string(),
+  usesManager: zod.boolean(),
+  length12Plus: zod.boolean(),
+  uniquePerSite: zod.boolean(),
+  mfaEverywhere: zod.boolean(),
+  score: zod.number(),
+  attestedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List incident response playbooks (seeds catalog on first call)
+ */
+export const GetPlaybooksResponseItem = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  category: zod.string(),
+  severity: zod.enum(["low", "medium", "high", "critical"]),
+  description: zod.string().nullish(),
+  stepCount: zod.number(),
+});
+export const GetPlaybooksResponse = zod.array(GetPlaybooksResponseItem);
+
+/**
+ * @summary Get a playbook with full steps
+ */
+export const GetPlaybookParams = zod.object({
+  playbookId: zod.coerce.number(),
+});
+
+export const GetPlaybookResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  category: zod.string(),
+  severity: zod.enum(["low", "medium", "high", "critical"]),
+  description: zod.string().nullish(),
+  steps: zod.array(
+    zod.object({
+      title: zod.string(),
+      detail: zod.string(),
+    }),
+  ),
+});
+
+/**
+ * @summary List active and resolved incidents
+ */
+export const GetIncidentsResponseItem = zod.object({
+  id: zod.number(),
+  playbookId: zod.number(),
+  playbookTitle: zod.string(),
+  playbookSeverity: zod.enum(["low", "medium", "high", "critical"]),
+  title: zod.string(),
+  status: zod.enum(["open", "resolved"]),
+  openedByName: zod.string(),
+  notes: zod.string().nullish(),
+  completedStepIndices: zod.array(zod.number()),
+  openedAt: zod.coerce.date(),
+  resolvedAt: zod.coerce.date().nullish(),
+});
+export const GetIncidentsResponse = zod.array(GetIncidentsResponseItem);
+
+/**
+ * @summary Open a new incident from a playbook
+ */
+export const CreateIncidentBody = zod.object({
+  playbookId: zod.number(),
+  title: zod.string(),
+  notes: zod.string().optional(),
+});
+
+/**
+ * @summary Update incident notes, completed steps, or resolve it
+ */
+export const UpdateIncidentParams = zod.object({
+  incidentId: zod.coerce.number(),
+});
+
+export const UpdateIncidentBody = zod.object({
+  status: zod.enum(["open", "resolved"]).optional(),
+  notes: zod.string().optional(),
+  completedStepIndices: zod.array(zod.number()).optional(),
+});
+
+export const UpdateIncidentResponse = zod.object({
+  id: zod.number(),
+  playbookId: zod.number(),
+  playbookTitle: zod.string(),
+  playbookSeverity: zod.enum(["low", "medium", "high", "critical"]),
+  title: zod.string(),
+  status: zod.enum(["open", "resolved"]),
+  openedByName: zod.string(),
+  notes: zod.string().nullish(),
+  completedStepIndices: zod.array(zod.number()),
+  openedAt: zod.coerce.date(),
+  resolvedAt: zod.coerce.date().nullish(),
+});
+
+/**
+ * @summary List vendor / SaaS risk register
+ */
+export const GetVendorsResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  category: zod.string(),
+  dataAccess: zod.enum(["low", "medium", "high", "critical"]),
+  hasMfa: zod.boolean(),
+  hasSso: zod.boolean(),
+  notes: zod.string().nullish(),
+  lastReviewedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+});
+export const GetVendorsResponse = zod.array(GetVendorsResponseItem);
+
+/**
+ * @summary Add a vendor to the register
+ */
+export const CreateVendorBody = zod.object({
+  name: zod.string(),
+  category: zod.string().optional(),
+  dataAccess: zod.enum(["low", "medium", "high", "critical"]),
+  hasMfa: zod.boolean().optional(),
+  hasSso: zod.boolean().optional(),
+  notes: zod.string().optional(),
+});
+
+export const UpdateVendorParams = zod.object({
+  vendorId: zod.coerce.number(),
+});
+
+export const UpdateVendorBody = zod.object({
+  name: zod.string().optional(),
+  category: zod.string().optional(),
+  dataAccess: zod.enum(["low", "medium", "high", "critical"]).optional(),
+  hasMfa: zod.boolean().optional(),
+  hasSso: zod.boolean().optional(),
+  notes: zod.string().optional(),
+  markReviewed: zod.boolean().optional(),
+});
+
+export const UpdateVendorResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  category: zod.string(),
+  dataAccess: zod.enum(["low", "medium", "high", "critical"]),
+  hasMfa: zod.boolean(),
+  hasSso: zod.boolean(),
+  notes: zod.string().nullish(),
+  lastReviewedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+});
+
+export const DeleteVendorParams = zod.object({
+  vendorId: zod.coerce.number(),
+});
+
+/**
+ * @summary List devices (owners see all, members see own)
+ */
+export const GetDevicesResponseItem = zod.object({
+  id: zod.number(),
+  memberId: zod.number(),
+  memberName: zod.string(),
+  name: zod.string(),
+  type: zod.enum(["laptop", "phone", "tablet", "desktop"]),
+  os: zod.string().nullish(),
+  mfaEnabled: zod.boolean(),
+  diskEncrypted: zod.boolean(),
+  autoUpdates: zod.boolean(),
+  notes: zod.string().nullish(),
+  updatedAt: zod.coerce.date(),
+});
+export const GetDevicesResponse = zod.array(GetDevicesResponseItem);
+
+/**
+ * @summary Add a device for the current user (or any member if owner)
+ */
+export const CreateDeviceBody = zod.object({
+  name: zod.string(),
+  type: zod.enum(["laptop", "phone", "tablet", "desktop"]),
+  os: zod.string().optional(),
+  mfaEnabled: zod.boolean().optional(),
+  diskEncrypted: zod.boolean().optional(),
+  autoUpdates: zod.boolean().optional(),
+  notes: zod.string().optional(),
+  memberId: zod
+    .number()
+    .optional()
+    .describe("Owner-only — assign device to another member"),
+});
+
+export const UpdateDeviceParams = zod.object({
+  deviceId: zod.coerce.number(),
+});
+
+export const UpdateDeviceBody = zod.object({
+  name: zod.string().optional(),
+  type: zod.enum(["laptop", "phone", "tablet", "desktop"]).optional(),
+  os: zod.string().optional(),
+  mfaEnabled: zod.boolean().optional(),
+  diskEncrypted: zod.boolean().optional(),
+  autoUpdates: zod.boolean().optional(),
+  notes: zod.string().optional(),
+});
+
+export const UpdateDeviceResponse = zod.object({
+  id: zod.number(),
+  memberId: zod.number(),
+  memberName: zod.string(),
+  name: zod.string(),
+  type: zod.enum(["laptop", "phone", "tablet", "desktop"]),
+  os: zod.string().nullish(),
+  mfaEnabled: zod.boolean(),
+  diskEncrypted: zod.boolean(),
+  autoUpdates: zod.boolean(),
+  notes: zod.string().nullish(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const DeleteDeviceParams = zod.object({
+  deviceId: zod.coerce.number(),
+});

@@ -22,6 +22,10 @@ tags:
     description: Team member management
   - name: dashboard
     description: Dashboard summaries
+  - name: security
+    description: Cybersecurity Autopilot — phishing simulations, training,
+      breach monitoring, password hygiene, incident playbooks, vendor risk,
+      device inventory, and overall posture score.
 
 paths:
   /healthz:
@@ -653,6 +657,455 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DashboardSummary"
+
+  # ─── SECURITY AUTOPILOT ──────────────────────────────────────────
+  /security/summary:
+    get:
+      operationId: getSecuritySummary
+      tags: [security]
+      summary: Overall security posture score + module subscores
+      responses:
+        "200":
+          description: Security summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecuritySummary"
+
+  /security/breach-checks:
+    get:
+      operationId: getSecurityBreachChecks
+      tags: [security]
+      summary: List the most recent breach scan for every team member
+      responses:
+        "200":
+          description: Breach checks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SecurityBreachCheck"
+
+  /security/breach-checks/{memberId}/refresh:
+    post:
+      operationId: refreshSecurityBreachCheck
+      tags: [security]
+      summary: Re-query the public breach API for one member's email
+      parameters:
+        - in: path
+          name: memberId
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Latest breach check
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecurityBreachCheck"
+
+  /security/phishing/templates:
+    get:
+      operationId: getPhishingTemplates
+      tags: [security]
+      summary: List built-in phishing email templates
+      responses:
+        "200":
+          description: Templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PhishingTemplate"
+
+  /security/phishing/campaigns:
+    get:
+      operationId: getPhishingCampaigns
+      tags: [security]
+      summary: List phishing simulation campaigns with summary stats
+      responses:
+        "200":
+          description: Campaigns
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PhishingCampaignSummary"
+    post:
+      operationId: createPhishingCampaign
+      tags: [security]
+      summary: Create a new phishing simulation campaign
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePhishingCampaignBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhishingCampaignDetail"
+
+  /security/phishing/campaigns/{campaignId}:
+    get:
+      operationId: getPhishingCampaign
+      tags: [security]
+      summary: Campaign detail with per-recipient tracking links + status
+      parameters:
+        - in: path
+          name: campaignId
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Campaign
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhishingCampaignDetail"
+    delete:
+      operationId: deletePhishingCampaign
+      tags: [security]
+      summary: Delete a campaign (and its tracking links)
+      parameters:
+        - in: path
+          name: campaignId
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  /security/training/lessons:
+    get:
+      operationId: getTrainingLessons
+      tags: [security]
+      summary: List training lessons (seeds catalog on first call)
+      responses:
+        "200":
+          description: Lessons
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TrainingLessonSummary"
+
+  /security/training/lessons/{lessonId}:
+    get:
+      operationId: getTrainingLesson
+      tags: [security]
+      summary: Get a lesson's full content (steps + quiz)
+      parameters:
+        - in: path
+          name: lessonId
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Lesson
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainingLessonDetail"
+
+  /security/training/lessons/{lessonId}/complete:
+    post:
+      operationId: completeTrainingLesson
+      tags: [security]
+      summary: Record a quiz completion for the current user
+      parameters:
+        - in: path
+          name: lessonId
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompleteTrainingLessonBody"
+      responses:
+        "200":
+          description: Recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainingCompletion"
+
+  /security/passwords:
+    get:
+      operationId: getPasswordAttestations
+      tags: [security]
+      summary: All team password-hygiene attestations (owner only)
+      responses:
+        "200":
+          description: Attestations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PasswordAttestation"
+
+  /security/passwords/me:
+    get:
+      operationId: getMyPasswordAttestation
+      tags: [security]
+      summary: Current user's attestation (or null)
+      responses:
+        "200":
+          description: Attestation or null
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: "null"
+                  - $ref: "#/components/schemas/PasswordAttestation"
+    put:
+      operationId: upsertMyPasswordAttestation
+      tags: [security]
+      summary: Submit / update current user's password-hygiene attestation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertPasswordAttestationBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasswordAttestation"
+
+  /security/playbooks:
+    get:
+      operationId: getPlaybooks
+      tags: [security]
+      summary: List incident response playbooks (seeds catalog on first call)
+      responses:
+        "200":
+          description: Playbooks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlaybookSummary"
+
+  /security/playbooks/{playbookId}:
+    get:
+      operationId: getPlaybook
+      tags: [security]
+      summary: Get a playbook with full steps
+      parameters:
+        - in: path
+          name: playbookId
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Playbook
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaybookDetail"
+
+  /security/incidents:
+    get:
+      operationId: getIncidents
+      tags: [security]
+      summary: List active and resolved incidents
+      responses:
+        "200":
+          description: Incidents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Incident"
+    post:
+      operationId: createIncident
+      tags: [security]
+      summary: Open a new incident from a playbook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateIncidentBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+
+  /security/incidents/{incidentId}:
+    patch:
+      operationId: updateIncident
+      tags: [security]
+      summary: Update incident notes, completed steps, or resolve it
+      parameters:
+        - in: path
+          name: incidentId
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateIncidentBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+
+  /security/vendors:
+    get:
+      operationId: getVendors
+      tags: [security]
+      summary: List vendor / SaaS risk register
+      responses:
+        "200":
+          description: Vendors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Vendor"
+    post:
+      operationId: createVendor
+      tags: [security]
+      summary: Add a vendor to the register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVendorBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+
+  /security/vendors/{vendorId}:
+    patch:
+      operationId: updateVendor
+      tags: [security]
+      parameters:
+        - in: path
+          name: vendorId
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVendorBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+    delete:
+      operationId: deleteVendor
+      tags: [security]
+      parameters:
+        - in: path
+          name: vendorId
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  /security/devices:
+    get:
+      operationId: getDevices
+      tags: [security]
+      summary: List devices (owners see all, members see own)
+      responses:
+        "200":
+          description: Devices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Device"
+    post:
+      operationId: createDevice
+      tags: [security]
+      summary: Add a device for the current user (or any member if owner)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDeviceBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Device"
+
+  /security/devices/{deviceId}:
+    patch:
+      operationId: updateDevice
+      tags: [security]
+      parameters:
+        - in: path
+          name: deviceId
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDeviceBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Device"
+    delete:
+      operationId: deleteDevice
+      tags: [security]
+      parameters:
+        - in: path
+          name: deviceId
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
 
 components:
   schemas:
@@ -1391,3 +1844,486 @@ components:
         - description
         - actorName
         - createdAt
+
+    # ─── SECURITY AUTOPILOT ──────────────────────────────────────
+    SecuritySummary:
+      type: object
+      properties:
+        postureScore:
+          type: integer
+          description: Weighted overall security posture (0-100)
+        modules:
+          type: object
+          properties:
+            breach:
+              $ref: "#/components/schemas/SecurityModuleScore"
+            training:
+              $ref: "#/components/schemas/SecurityModuleScore"
+            phishing:
+              $ref: "#/components/schemas/SecurityModuleScore"
+            password:
+              $ref: "#/components/schemas/SecurityModuleScore"
+            vendors:
+              $ref: "#/components/schemas/SecurityModuleScore"
+            devices:
+              $ref: "#/components/schemas/SecurityModuleScore"
+          required: [breach, training, phishing, password, vendors, devices]
+        counts:
+          type: object
+          properties:
+            openIncidents: { type: integer }
+            totalBreaches: { type: integer }
+            membersTrained: { type: integer }
+            totalMembers: { type: integer }
+            totalVendors: { type: integer }
+            totalDevices: { type: integer }
+            mfaDevices: { type: integer }
+          required:
+            - openIncidents
+            - totalBreaches
+            - membersTrained
+            - totalMembers
+            - totalVendors
+            - totalDevices
+            - mfaDevices
+      required: [postureScore, modules, counts]
+
+    SecurityModuleScore:
+      type: object
+      properties:
+        score:
+          type: integer
+          description: 0-100 subscore for this module
+        label:
+          type: string
+        detail:
+          type: string
+      required: [score, label, detail]
+
+    SecurityBreachCheck:
+      type: object
+      properties:
+        id: { type: integer }
+        memberId: { type: integer }
+        memberName: { type: string }
+        email: { type: string }
+        breachCount: { type: integer }
+        breaches:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              date: { type: ["string", "null"] }
+              dataClasses:
+                type: array
+                items: { type: string }
+            required: [name, dataClasses]
+        checkedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - memberId
+        - memberName
+        - email
+        - breachCount
+        - breaches
+        - checkedAt
+
+    PhishingTemplate:
+      type: object
+      properties:
+        key: { type: string }
+        name: { type: string }
+        difficulty:
+          type: string
+          enum: [easy, medium, hard]
+        subject: { type: string }
+        previewBody: { type: string }
+        landingTeach: { type: string }
+        redFlags:
+          type: array
+          items: { type: string }
+      required: [key, name, difficulty, subject, previewBody, landingTeach, redFlags]
+
+    PhishingCampaignSummary:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        templateKey: { type: string }
+        templateName: { type: string }
+        recipientCount: { type: integer }
+        clickCount: { type: integer }
+        reportCount: { type: integer }
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - templateKey
+        - templateName
+        - recipientCount
+        - clickCount
+        - reportCount
+        - createdAt
+
+    PhishingCampaignDetail:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        templateKey: { type: string }
+        template:
+          $ref: "#/components/schemas/PhishingTemplate"
+        createdAt:
+          type: string
+          format: date-time
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/PhishingResult"
+      required: [id, name, templateKey, template, createdAt, results]
+
+    PhishingResult:
+      type: object
+      properties:
+        id: { type: integer }
+        memberId: { type: integer }
+        memberName: { type: string }
+        memberEmail: { type: string }
+        token: { type: string }
+        link: { type: string }
+        clickedAt:
+          type: ["string", "null"]
+          format: date-time
+        reportedAt:
+          type: ["string", "null"]
+          format: date-time
+      required: [id, memberId, memberName, memberEmail, token, link]
+
+    CreatePhishingCampaignBody:
+      type: object
+      properties:
+        name: { type: string }
+        templateKey: { type: string }
+        recipientMemberIds:
+          type: array
+          items: { type: integer }
+          minItems: 1
+      required: [name, templateKey, recipientMemberIds]
+
+    TrainingLessonSummary:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        description: { type: ["string", "null"] }
+        category: { type: string }
+        durationMinutes: { type: integer }
+        completedByMe: { type: boolean }
+        completionCount: { type: integer }
+        totalMembers: { type: integer }
+      required:
+        - id
+        - title
+        - category
+        - durationMinutes
+        - completedByMe
+        - completionCount
+        - totalMembers
+
+    TrainingLessonDetail:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        description: { type: ["string", "null"] }
+        category: { type: string }
+        durationMinutes: { type: integer }
+        steps:
+          type: array
+          items:
+            type: object
+            properties:
+              title: { type: string }
+              body: { type: string }
+            required: [title, body]
+        quiz:
+          type: array
+          items:
+            type: object
+            properties:
+              q: { type: string }
+              choices:
+                type: array
+                items: { type: string }
+              answerIdx: { type: integer }
+            required: [q, choices, answerIdx]
+        completedByMe: { type: boolean }
+        myScore:
+          type: ["integer", "null"]
+      required:
+        - id
+        - title
+        - category
+        - durationMinutes
+        - steps
+        - quiz
+        - completedByMe
+
+    CompleteTrainingLessonBody:
+      type: object
+      properties:
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+      required: [score]
+
+    TrainingCompletion:
+      type: object
+      properties:
+        id: { type: integer }
+        lessonId: { type: integer }
+        memberId: { type: integer }
+        score: { type: integer }
+        completedAt:
+          type: string
+          format: date-time
+      required: [id, lessonId, memberId, score, completedAt]
+
+    PasswordAttestation:
+      type: object
+      properties:
+        id: { type: integer }
+        memberId: { type: integer }
+        memberName: { type: string }
+        usesManager: { type: boolean }
+        length12Plus: { type: boolean }
+        uniquePerSite: { type: boolean }
+        mfaEverywhere: { type: boolean }
+        score: { type: integer }
+        attestedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - memberId
+        - memberName
+        - usesManager
+        - length12Plus
+        - uniquePerSite
+        - mfaEverywhere
+        - score
+        - attestedAt
+
+    UpsertPasswordAttestationBody:
+      type: object
+      properties:
+        usesManager: { type: boolean }
+        length12Plus: { type: boolean }
+        uniquePerSite: { type: boolean }
+        mfaEverywhere: { type: boolean }
+      required: [usesManager, length12Plus, uniquePerSite, mfaEverywhere]
+
+    PlaybookSummary:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        category: { type: string }
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        description: { type: ["string", "null"] }
+        stepCount: { type: integer }
+      required: [id, title, category, severity, stepCount]
+
+    PlaybookDetail:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        category: { type: string }
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        description: { type: ["string", "null"] }
+        steps:
+          type: array
+          items:
+            type: object
+            properties:
+              title: { type: string }
+              detail: { type: string }
+            required: [title, detail]
+      required: [id, title, category, severity, steps]
+
+    Incident:
+      type: object
+      properties:
+        id: { type: integer }
+        playbookId: { type: integer }
+        playbookTitle: { type: string }
+        playbookSeverity:
+          type: string
+          enum: [low, medium, high, critical]
+        title: { type: string }
+        status:
+          type: string
+          enum: [open, resolved]
+        openedByName: { type: string }
+        notes: { type: ["string", "null"] }
+        completedStepIndices:
+          type: array
+          items: { type: integer }
+        openedAt:
+          type: string
+          format: date-time
+        resolvedAt:
+          type: ["string", "null"]
+          format: date-time
+      required:
+        - id
+        - playbookId
+        - playbookTitle
+        - playbookSeverity
+        - title
+        - status
+        - openedByName
+        - completedStepIndices
+        - openedAt
+
+    CreateIncidentBody:
+      type: object
+      properties:
+        playbookId: { type: integer }
+        title: { type: string }
+        notes: { type: string }
+      required: [playbookId, title]
+
+    UpdateIncidentBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [open, resolved]
+        notes: { type: string }
+        completedStepIndices:
+          type: array
+          items: { type: integer }
+
+    Vendor:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        category: { type: string }
+        dataAccess:
+          type: string
+          enum: [low, medium, high, critical]
+        hasMfa: { type: boolean }
+        hasSso: { type: boolean }
+        notes: { type: ["string", "null"] }
+        lastReviewedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - category
+        - dataAccess
+        - hasMfa
+        - hasSso
+        - createdAt
+
+    CreateVendorBody:
+      type: object
+      properties:
+        name: { type: string }
+        category: { type: string }
+        dataAccess:
+          type: string
+          enum: [low, medium, high, critical]
+        hasMfa: { type: boolean }
+        hasSso: { type: boolean }
+        notes: { type: string }
+      required: [name, dataAccess]
+
+    UpdateVendorBody:
+      type: object
+      properties:
+        name: { type: string }
+        category: { type: string }
+        dataAccess:
+          type: string
+          enum: [low, medium, high, critical]
+        hasMfa: { type: boolean }
+        hasSso: { type: boolean }
+        notes: { type: string }
+        markReviewed: { type: boolean }
+
+    Device:
+      type: object
+      properties:
+        id: { type: integer }
+        memberId: { type: integer }
+        memberName: { type: string }
+        name: { type: string }
+        type:
+          type: string
+          enum: [laptop, phone, tablet, desktop]
+        os: { type: ["string", "null"] }
+        mfaEnabled: { type: boolean }
+        diskEncrypted: { type: boolean }
+        autoUpdates: { type: boolean }
+        notes: { type: ["string", "null"] }
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - memberId
+        - memberName
+        - name
+        - type
+        - mfaEnabled
+        - diskEncrypted
+        - autoUpdates
+        - updatedAt
+
+    CreateDeviceBody:
+      type: object
+      properties:
+        name: { type: string }
+        type:
+          type: string
+          enum: [laptop, phone, tablet, desktop]
+        os: { type: string }
+        mfaEnabled: { type: boolean }
+        diskEncrypted: { type: boolean }
+        autoUpdates: { type: boolean }
+        notes: { type: string }
+        memberId:
+          type: integer
+          description: Owner-only — assign device to another member
+      required: [name, type]
+
+    UpdateDeviceBody:
+      type: object
+      properties:
+        name: { type: string }
+        type:
+          type: string
+          enum: [laptop, phone, tablet, desktop]
+        os: { type: string }
+        mfaEnabled: { type: boolean }
+        diskEncrypted: { type: boolean }
+        autoUpdates: { type: boolean }
+        notes: { type: string }

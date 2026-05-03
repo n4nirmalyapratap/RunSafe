@@ -6,6 +6,7 @@ import sopsRouter from "./sops";
 import tasksRouter from "./tasks";
 import complianceRouter from "./compliance";
 import dashboardRouter from "./dashboard";
+import securityRouter from "./security";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(sopsRouter);
 router.use(tasksRouter);
 router.use(complianceRouter);
 router.use(dashboardRouter);
+router.use(securityRouter);
 
 export default router;
