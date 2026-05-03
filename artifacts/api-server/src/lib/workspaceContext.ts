@@ -18,13 +18,16 @@ const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
  * Priority:
  *  1. Owner match via workspaces.ownerClerkId
  *  2. Member match via team_members.clerkId (already linked)
+ *     – if team_members.role = "owner", returns role:"owner" so invited
+ *       owners get the same access level as the primary workspace owner.
  *  3. Email-based auto-link: if the user's Clerk email matches a pending
- *     team_members.email with clerkId = null, link them and return member ctx.
+ *     team_members.email with clerkId = null, link them and return context.
  * Returns null if the user has no workspace affiliation.
  */
 export async function getWorkspaceContext(
   clerkId: string,
 ): Promise<WorkspaceContext | null> {
+  // 1. Primary owner check
   const [ownerWs] = await db
     .select()
     .from(workspacesTable)
@@ -34,10 +37,12 @@ export async function getWorkspaceContext(
     return { workspaceId: ownerWs.id, role: "owner", plan: ownerWs.plan };
   }
 
+  // 2. Already-linked team member check
   const [member] = await db
     .select({
       memberId: teamMembersTable.id,
       workspaceId: teamMembersTable.workspaceId,
+      memberRole: teamMembersTable.role,
     })
     .from(teamMembersTable)
     .where(eq(teamMembersTable.clerkId, clerkId));
@@ -49,15 +54,19 @@ export async function getWorkspaceContext(
       .where(eq(workspacesTable.id, member.workspaceId));
 
     if (ws) {
+      // Invited team members with role="owner" receive full owner-level access
+      const resolvedRole: WorkspaceRole =
+        member.memberRole === "owner" ? "owner" : "member";
       return {
         workspaceId: ws.id,
-        role: "member",
+        role: resolvedRole,
         memberId: member.memberId,
         plan: ws.plan,
       };
     }
   }
 
+  // 3. Email-based auto-link for invited members whose clerkId is not yet set
   try {
     const clerkUser = await clerk.users.getUser(clerkId);
     const primaryEmail = clerkUser.emailAddresses.find(
@@ -87,9 +96,11 @@ export async function getWorkspaceContext(
           .where(eq(workspacesTable.id, unlinked.workspaceId));
 
         if (ws) {
+          const resolvedRole: WorkspaceRole =
+            unlinked.role === "owner" ? "owner" : "member";
           return {
             workspaceId: ws.id,
-            role: "member",
+            role: resolvedRole,
             memberId: unlinked.id,
             plan: ws.plan,
           };
