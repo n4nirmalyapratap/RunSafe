@@ -6,7 +6,7 @@ import {
   getGetWorkspaceQueryKey,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, CheckSquare, ShieldAlert, Activity, AlertTriangle, Calendar } from "lucide-react";
+import { FileText, CheckSquare, ShieldAlert, Activity, AlertTriangle, Calendar, CalendarClock } from "lucide-react";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +42,57 @@ export function Dashboard() {
     <AppLayout>
       <div className="space-y-8">
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+
+        {isOwner && summary.nextDueComplianceItem && (
+          <Card
+            className={
+              summary.nextDueComplianceItem.status === "overdue"
+                ? "border-destructive bg-destructive/5"
+                : summary.nextDueComplianceItem.daysUntilDue <= 7
+                  ? "border-amber-500 bg-amber-50 dark:bg-amber-950/20"
+                  : ""
+            }
+          >
+            <CardContent className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-6">
+              <div className="flex gap-4 items-start">
+                <div
+                  className={`h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                    summary.nextDueComplianceItem.status === "overdue"
+                      ? "bg-destructive/15 text-destructive"
+                      : "bg-amber-500/15 text-amber-600"
+                  }`}
+                >
+                  <CalendarClock className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-1">
+                    Next compliance deadline
+                  </div>
+                  <div className="text-lg font-semibold">{summary.nextDueComplianceItem.title}</div>
+                  <div className="flex flex-wrap gap-2 mt-2 text-sm">
+                    <Badge variant="secondary">
+                      {summary.nextDueComplianceItem.category.replace("_", " ")}
+                    </Badge>
+                    <Badge
+                      variant={
+                        summary.nextDueComplianceItem.status === "overdue" ? "destructive" : "outline"
+                      }
+                    >
+                      Due {format(new Date(summary.nextDueComplianceItem.dueDate), "MMM d, yyyy")}
+                    </Badge>
+                    <span className="text-muted-foreground">
+                      {summary.nextDueComplianceItem.daysUntilDue < 0
+                        ? `${Math.abs(summary.nextDueComplianceItem.daysUntilDue)} days overdue`
+                        : summary.nextDueComplianceItem.daysUntilDue === 0
+                          ? "Due today"
+                          : `In ${summary.nextDueComplianceItem.daysUntilDue} days`}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className={`grid gap-4 md:grid-cols-2 ${isOwner ? "lg:grid-cols-4" : "lg:grid-cols-2"}`}>
           <Card>

@@ -13,6 +13,8 @@ export const complianceItemsTable = pgTable("compliance_items", {
   lastCompletedAt: timestamp("last_completed_at", { withTimezone: true }),
   lastReminderSentAt: timestamp("last_reminder_sent_at", { withTimezone: true }),
   status: text("status").notNull().default("pending"),
+  reminder7SentForDueDate: date("reminder_7_sent_for_due_date"),
+  reminder1SentForDueDate: date("reminder_1_sent_for_due_date"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

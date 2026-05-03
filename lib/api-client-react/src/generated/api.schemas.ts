@@ -21,7 +21,16 @@ export const WorkspacePlan = {
   pro: "pro",
 } as const;
 
-export type WorkspaceUserRole = "owner" | "member";
+/**
+ * Server-resolved role for the authenticated user in this workspace.
+ */
+export type WorkspaceUserRole =
+  (typeof WorkspaceUserRole)[keyof typeof WorkspaceUserRole];
+
+export const WorkspaceUserRole = {
+  owner: "owner",
+  member: "member",
+} as const;
 
 export interface Workspace {
   id: number;
@@ -386,6 +395,25 @@ export interface ComplianceCompletion {
   completedAt: string;
 }
 
+export type NextDueComplianceItemStatus =
+  (typeof NextDueComplianceItemStatus)[keyof typeof NextDueComplianceItemStatus];
+
+export const NextDueComplianceItemStatus = {
+  pending: "pending",
+  upcoming: "upcoming",
+  overdue: "overdue",
+  completed: "completed",
+} as const;
+
+export interface NextDueComplianceItem {
+  id: number;
+  title: string;
+  category: string;
+  dueDate: string;
+  status: NextDueComplianceItemStatus;
+  daysUntilDue: number;
+}
+
 export type ActivityItemType =
   (typeof ActivityItemType)[keyof typeof ActivityItemType];
 
@@ -421,6 +449,7 @@ export interface DashboardSummary {
   overdueTasks: number;
   overdueComplianceItems: number;
   upcomingComplianceItems: number;
+  nextDueComplianceItem: null | NextDueComplianceItem;
   teamMemberCount: number;
   recentActivity: ActivityItem[];
   upcomingComplianceDeadlines?: UpcomingComplianceDeadline[];

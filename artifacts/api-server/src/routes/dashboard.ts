@@ -28,6 +28,7 @@ router.get("/dashboard/summary", requireAuth, async (req, res): Promise<void> =>
         overdueTasks: 0,
         overdueComplianceItems: 0,
         upcomingComplianceItems: 0,
+        nextDueComplianceItem: null,
         teamMemberCount: 0,
         recentActivity: [],
       }),
@@ -112,6 +113,7 @@ router.get("/dashboard/summary", requireAuth, async (req, res): Promise<void> =>
         overdueTasks: overdueTasksResult?.count ?? 0,
         overdueComplianceItems: 0,
         upcomingComplianceItems: 0,
+        nextDueComplianceItem: null,
         teamMemberCount: 0,
         recentActivity: taskActivity,
       }),
@@ -145,11 +147,20 @@ router.get("/dashboard/summary", requireAuth, async (req, res): Promise<void> =>
     daysUntilDue: number;
     status: "overdue" | "upcoming";
   }> = [];
+  let nextDueItem: {
+    id: number;
+    title: string;
+    category: string;
+    dueDate: string;
+    status: string;
+    daysUntilDue: number;
+  } | null = null;
+
   for (const item of complianceItems) {
     if (!item.dueDate) continue;
-    if (item.lastCompletedAt) continue; // exclude already completed
+    if (item.status === "completed") continue;
     const due = new Date(item.dueDate);
-    const days = Math.round((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const daysUntilDue = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     if (due < now) {
       overdueCompliance++;
       deadlineList.push({
@@ -157,7 +168,7 @@ router.get("/dashboard/summary", requireAuth, async (req, res): Promise<void> =>
         title: item.title,
         category: item.category,
         dueDate: item.dueDate,
-        daysUntilDue: days,
+        daysUntilDue,
         status: "overdue",
       });
     } else if (due <= thirtyDaysFromNow) {
@@ -167,9 +178,21 @@ router.get("/dashboard/summary", requireAuth, async (req, res): Promise<void> =>
         title: item.title,
         category: item.category,
         dueDate: item.dueDate,
-        daysUntilDue: days,
+        daysUntilDue,
         status: "upcoming",
       });
+    }
+
+    const status = due < now ? "overdue" : daysUntilDue <= 30 ? "upcoming" : "pending";
+    if (!nextDueItem || due < new Date(nextDueItem.dueDate)) {
+      nextDueItem = {
+        id: item.id,
+        title: item.title,
+        category: item.category,
+        dueDate: item.dueDate,
+        status,
+        daysUntilDue,
+      };
     }
   }
   // Show the most urgent first (overdue, then soonest upcoming) — top 5
@@ -212,6 +235,7 @@ router.get("/dashboard/summary", requireAuth, async (req, res): Promise<void> =>
       overdueTasks: overdueTasksResult?.count ?? 0,
       overdueComplianceItems: overdueCompliance,
       upcomingComplianceItems: upcomingCompliance,
+      nextDueComplianceItem: nextDueItem,
       teamMemberCount: teamCountResult?.count ?? 0,
       recentActivity,
       upcomingComplianceDeadlines,

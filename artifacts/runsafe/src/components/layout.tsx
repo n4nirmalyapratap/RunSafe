@@ -3,7 +3,12 @@ import { User, FileText, CheckSquare, ShieldCheck, Users, Settings, LogOut, Menu
 import { useClerk, useUser } from "@clerk/react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { useGetWorkspace, getGetWorkspaceQueryKey } from "@workspace/api-client-react";
+import {
+  useGetWorkspace,
+  getGetWorkspaceQueryKey,
+  useGetDashboardSummary,
+  getGetDashboardSummaryQueryKey,
+} from "@workspace/api-client-react";
 
 const OWNER_NAV = [
   { href: "/dashboard", label: "Dashboard", icon: User },
@@ -24,9 +29,13 @@ export function Sidebar({ mobile = false, close = () => {} }: { mobile?: boolean
   const { signOut } = useClerk();
   const { user } = useUser();
   const { data: workspace } = useGetWorkspace({ query: { queryKey: getGetWorkspaceQueryKey() } });
+  const { data: summary } = useGetDashboardSummary({
+    query: { queryKey: getGetDashboardSummaryQueryKey() },
+  });
 
   const isOwner = workspace?.userRole === "owner";
   const navItems = isOwner ? OWNER_NAV : MEMBER_NAV;
+  const overdueCompliance = summary?.overdueComplianceItems ?? 0;
 
   const handleSignOut = () => {
     signOut(() => { window.location.href = import.meta.env.BASE_URL; });
@@ -54,7 +63,12 @@ export function Sidebar({ mobile = false, close = () => {} }: { mobile?: boolean
               onClick={() => { if (mobile) close(); }}
             >
               <item.icon className="h-5 w-5" />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {item.href === "/compliance" && isOwner && overdueCompliance > 0 && (
+                <span className="ml-auto inline-flex items-center justify-center min-w-[1.5rem] h-6 px-2 rounded-full text-xs font-bold bg-destructive text-destructive-foreground">
+                  {overdueCompliance}
+                </span>
+              )}
             </Link>
           );
         })}

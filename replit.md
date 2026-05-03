@@ -48,6 +48,18 @@ lib/
 
 Tables: `workspaces`, `team_members`, `sops`, `sop_steps`, `task_assignments`, `task_step_completions`, `compliance_items`, `compliance_completions`
 
+## Compliance reminders
+
+The dashboard surfaces the next upcoming compliance deadline (with overdue/due-soon styling), and the sidebar shows a red badge with the count of overdue compliance items.
+
+A daily cron-callable endpoint dispatches deadline reminder emails:
+- Endpoint: `POST /api/compliance/send-reminders`
+- Auth: `Authorization: Bearer $REMINDER_CRON_TOKEN`
+- Behavior: scans non-completed compliance items and emails the workspace owner when `dueDate` is exactly 7 or 1 day away (also today). Per-due-date dedupe is stored on the row (`reminder_7_sent_for_due_date`, `reminder_1_sent_for_due_date`).
+- Email transport: uses Resend if `RESEND_API_KEY` is set (configurable `REMINDER_FROM_EMAIL`); otherwise logs to the API server's pino logger.
+- Recurring items (`monthly`/`quarterly`/`annually`) auto-advance their due date and reset reminder markers when marked complete.
+- Cron driver: `pnpm --filter @workspace/scripts run send-compliance-reminders`, suitable for a Replit Scheduled Deployment. Required envs for the script: `REMINDER_API_URL`, `REMINDER_CRON_TOKEN`.
+
 Demo seed data: "Green Leaf Cafe" workspace (ownerClerkId: "demo_seed_owner"), 3 team members, 3 SOPs, tasks, compliance items.
 
 ## Key API Routes (all under /api prefix)

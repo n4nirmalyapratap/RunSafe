@@ -5,6 +5,7 @@
  * RunSafe API — SMB Operations & Compliance SaaS
  * OpenAPI spec version: 0.1.0
  */
+import type { SopAssignment } from "./sopAssignment";
 import type { SopStep } from "./sopStep";
 
 export interface SopDetail {
@@ -14,9 +15,12 @@ export interface SopDetail {
   /** @nullable */
   description?: string | null;
   /** @nullable */
+  notes?: string | null;
+  /** @nullable */
   category?: string | null;
   createdByClerkId: string;
   createdAt: Date;
   updatedAt: Date;
   steps: SopStep[];
+  assignments?: SopAssignment[];
 }

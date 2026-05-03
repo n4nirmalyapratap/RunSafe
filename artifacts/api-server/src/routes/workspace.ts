@@ -88,7 +88,7 @@ router.patch("/workspace", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  res.json(UpdateWorkspaceResponse.parse(workspace));
+  res.json(UpdateWorkspaceResponse.parse({ ...workspace, userRole: ctx.role }));
 });
 
 export default router;

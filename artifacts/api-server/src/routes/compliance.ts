@@ -1,6 +1,7 @@
-import { Router, type IRouter } from "express";
-import { eq, and, desc } from "drizzle-orm";
-import { db, complianceItemsTable, complianceCompletionsTable } from "@workspace/db";
+import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
+import { eq, and, desc, isNotNull, sql } from "drizzle-orm";
+import { db, complianceItemsTable, complianceCompletionsTable, workspacesTable } from "@workspace/db";
+import { sendEmail } from "../lib/email";
 import {
   GetComplianceItemsQueryParams,
   GetComplianceItemsResponse,
@@ -22,15 +23,59 @@ const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
 const router: IRouter = Router();
 
-function computeStatus(dueDate: string | null, lastCompletedAt: Date | null): string {
-  if (lastCompletedAt) return "completed";
-  if (!dueDate) return "pending";
+function computeStatus(
+  dueDate: string | null,
+  lastCompletedAt: Date | null,
+  persistedStatus?: string | null,
+): string {
+  // Trust the persisted "completed" status — the complete endpoint sets it
+  // explicitly for one-time items, and resets recurring items to "pending"
+  // with a fresh dueDate. This prevents one-time completed items from
+  // being recomputed as overdue/upcoming.
+  if (persistedStatus === "completed") return "completed";
+  if (!dueDate) {
+    return lastCompletedAt ? "completed" : "pending";
+  }
   const due = new Date(dueDate);
   const now = new Date();
   const diffDays = (due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
   if (diffDays < 0) return "overdue";
   if (diffDays <= 30) return "upcoming";
   return "pending";
+}
+
+function advanceDueDate(currentDueDate: string | null, recurrence: string): string | null {
+  const base = currentDueDate ? new Date(currentDueDate) : new Date();
+  const d = new Date(base);
+  switch (recurrence) {
+    case "monthly":
+      d.setMonth(d.getMonth() + 1);
+      break;
+    case "quarterly":
+      d.setMonth(d.getMonth() + 3);
+      break;
+    case "annually":
+      d.setFullYear(d.getFullYear() + 1);
+      break;
+    default:
+      return null;
+  }
+  // Roll forward until in the future, in case the original due date was old
+  const today = new Date();
+  while (d < today) {
+    switch (recurrence) {
+      case "monthly":
+        d.setMonth(d.getMonth() + 1);
+        break;
+      case "quarterly":
+        d.setMonth(d.getMonth() + 3);
+        break;
+      case "annually":
+        d.setFullYear(d.getFullYear() + 1);
+        break;
+    }
+  }
+  return d.toISOString().split("T")[0];
 }
 
 function requireOwnerWithPlan(
@@ -129,7 +174,10 @@ router.post("/compliance/initialize", requireAuth, async (req, res): Promise<voi
     .returning();
 
   res.status(201).json(
-    inserted.map((item) => ({ ...item, status: computeStatus(item.dueDate, item.lastCompletedAt) })),
+    inserted.map((item) => ({
+      ...item,
+      status: computeStatus(item.dueDate, item.lastCompletedAt, item.status),
+    })),
   );
 });
 
@@ -158,7 +206,7 @@ router.get("/compliance/items", requireAuth, async (req, res): Promise<void> => 
 
   const enriched = items.map((item) => ({
     ...item,
-    status: computeStatus(item.dueDate, item.lastCompletedAt),
+    status: computeStatus(item.dueDate, item.lastCompletedAt, item.status),
   }));
 
   res.json(GetComplianceItemsResponse.parse(enriched));
@@ -190,7 +238,10 @@ router.post("/compliance/items", requireAuth, async (req, res): Promise<void> =>
     })
     .returning();
 
-  res.status(201).json({ ...item, status: computeStatus(item.dueDate, null) });
+  res.status(201).json({
+    ...item,
+    status: computeStatus(item.dueDate, null, item.status),
+  });
 });
 
 router.patch("/compliance/items/:itemId", requireAuth, async (req, res): Promise<void> => {
@@ -240,7 +291,7 @@ router.patch("/compliance/items/:itemId", requireAuth, async (req, res): Promise
   res.json(
     UpdateComplianceItemResponse.parse({
       ...item,
-      status: computeStatus(item.dueDate, item.lastCompletedAt),
+      status: computeStatus(item.dueDate, item.lastCompletedAt, item.status),
     }),
   );
 });
@@ -321,9 +372,27 @@ router.post("/compliance/items/:itemId/complete", requireAuth, async (req, res):
     // non-fatal — fall back to default
   }
 
+  // For recurring items, advance the due date and reset reminder tracking + status
+  const nextDueDate =
+    existingItem.recurrence !== "one_time"
+      ? advanceDueDate(existingItem.dueDate, existingItem.recurrence)
+      : null;
+
+  const updatePayload: Record<string, unknown> = {
+    lastCompletedAt: completedAt,
+  };
+  if (nextDueDate) {
+    updatePayload.dueDate = nextDueDate;
+    updatePayload.status = "pending";
+    updatePayload.reminder7SentForDueDate = null;
+    updatePayload.reminder1SentForDueDate = null;
+  } else {
+    updatePayload.status = "completed";
+  }
+
   await db
     .update(complianceItemsTable)
-    .set({ lastCompletedAt: completedAt, status: "completed" })
+    .set(updatePayload)
     .where(
       and(
         eq(complianceItemsTable.id, params.data.itemId),
@@ -395,6 +464,125 @@ router.post("/compliance/reminders/run", requireAuth, async (req, res): Promise<
   }
   const result = await runComplianceReminderScan();
   res.json(result);
+});
+
+// ─── Compliance reminder cron endpoint ─────────────────────────
+// Auth via shared bearer token (REMINDER_CRON_TOKEN). Designed to be invoked
+// by a Replit Scheduled Deployment / external cron once a day.
+function requireCronToken(req: Request, res: Response, next: NextFunction): void {
+  const expected = process.env.REMINDER_CRON_TOKEN;
+  if (!expected) {
+    res.status(500).json({ error: "REMINDER_CRON_TOKEN not configured" });
+    return;
+  }
+  const header = req.header("authorization") ?? "";
+  const provided = header.startsWith("Bearer ") ? header.slice(7) : header;
+  if (provided !== expected) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  next();
+}
+
+router.post("/compliance/send-reminders", requireCronToken, async (_req, res): Promise<void> => {
+  const today = new Date();
+  const todayStr = today.toISOString().split("T")[0];
+  const sevenDaysOut = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .split("T")[0];
+  const oneDayOut = new Date(today.getTime() + 1 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .split("T")[0];
+
+  // Fetch candidate items (have a due date, not completed-and-non-recurring already past).
+  const items = await db
+    .select({
+      id: complianceItemsTable.id,
+      workspaceId: complianceItemsTable.workspaceId,
+      title: complianceItemsTable.title,
+      dueDate: complianceItemsTable.dueDate,
+      reminder7SentForDueDate: complianceItemsTable.reminder7SentForDueDate,
+      reminder1SentForDueDate: complianceItemsTable.reminder1SentForDueDate,
+      ownerClerkId: workspacesTable.ownerClerkId,
+      workspaceName: workspacesTable.name,
+    })
+    .from(complianceItemsTable)
+    .innerJoin(workspacesTable, eq(workspacesTable.id, complianceItemsTable.workspaceId))
+    .where(
+      and(
+        isNotNull(complianceItemsTable.dueDate),
+        sql`${complianceItemsTable.status} != 'completed'`,
+      ),
+    );
+
+  let sent = 0;
+  let skipped = 0;
+  const ownerEmailCache = new Map<string, string | null>();
+
+  async function getOwnerEmail(clerkId: string): Promise<string | null> {
+    if (ownerEmailCache.has(clerkId)) return ownerEmailCache.get(clerkId)!;
+    try {
+      const user = await clerk.users.getUser(clerkId);
+      const email =
+        user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId)?.emailAddress ?? null;
+      ownerEmailCache.set(clerkId, email);
+      return email;
+    } catch {
+      ownerEmailCache.set(clerkId, null);
+      return null;
+    }
+  }
+
+  for (const item of items) {
+    if (!item.dueDate) continue;
+
+    const isSevenDayWindow = item.dueDate === sevenDaysOut;
+    const isOneDayWindow = item.dueDate === oneDayOut || item.dueDate === todayStr;
+    if (!isSevenDayWindow && !isOneDayWindow) continue;
+
+    const alreadySent =
+      (isSevenDayWindow && item.reminder7SentForDueDate === item.dueDate) ||
+      (isOneDayWindow && item.reminder1SentForDueDate === item.dueDate);
+    if (alreadySent) {
+      skipped++;
+      continue;
+    }
+
+    const email = await getOwnerEmail(item.ownerClerkId);
+    if (!email) {
+      skipped++;
+      continue;
+    }
+
+    const window = isSevenDayWindow ? "7 days" : "1 day";
+    const subject = `RunSafe reminder: "${item.title}" is due in ${window}`;
+    const html = `
+      <p>Hi there,</p>
+      <p>This is a friendly reminder from <strong>RunSafe</strong> for <strong>${item.workspaceName}</strong>.</p>
+      <p>The compliance item <strong>${item.title}</strong> is due on <strong>${item.dueDate}</strong> (${window} from today).</p>
+      <p>Open RunSafe to mark it complete or update the due date.</p>
+    `;
+    const text = `Reminder: "${item.title}" is due on ${item.dueDate} (${window} from today). Open RunSafe to take action.`;
+
+    const result = await sendEmail({ to: email, subject, html, text });
+    if (!result.ok) {
+      skipped++;
+      continue;
+    }
+
+    const updatePayload: Record<string, unknown> = {};
+    if (isSevenDayWindow) updatePayload.reminder7SentForDueDate = item.dueDate;
+    if (isOneDayWindow) updatePayload.reminder1SentForDueDate = item.dueDate;
+
+    await db
+      .update(complianceItemsTable)
+      .set(updatePayload)
+      .where(eq(complianceItemsTable.id, item.id));
+
+    sent++;
+  }
+
+  res.json({ sent, skipped, scanned: items.length });
 });
 
 export default router;

@@ -9,5 +9,6 @@
 export interface UpdateSopBody {
   title?: string;
   description?: string;
+  notes?: string;
   category?: string;
 }

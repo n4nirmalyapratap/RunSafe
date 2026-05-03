@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { WorkspacePlan } from "./workspacePlan";
+import type { WorkspaceUserRole } from "./workspaceUserRole";
 
 export interface Workspace {
   id: number;
@@ -19,4 +20,6 @@ export interface Workspace {
   plan: WorkspacePlan;
   ownerClerkId: string;
   createdAt: Date;
+  /** Server-resolved role for the authenticated user in this workspace. */
+  userRole: WorkspaceUserRole;
 }

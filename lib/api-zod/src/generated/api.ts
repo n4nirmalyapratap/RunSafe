@@ -26,7 +26,11 @@ export const GetWorkspaceResponse = zod.object({
   plan: zod.enum(["starter", "growth", "pro"]),
   ownerClerkId: zod.string(),
   createdAt: zod.coerce.date(),
-  userRole: zod.enum(["owner", "member"]),
+  userRole: zod
+    .enum(["owner", "member"])
+    .describe(
+      "Server-resolved role for the authenticated user in this workspace.",
+    ),
 });
 
 /**
@@ -59,6 +63,11 @@ export const UpdateWorkspaceResponse = zod.object({
   plan: zod.enum(["starter", "growth", "pro"]),
   ownerClerkId: zod.string(),
   createdAt: zod.coerce.date(),
+  userRole: zod
+    .enum(["owner", "member"])
+    .describe(
+      "Server-resolved role for the authenticated user in this workspace.",
+    ),
 });
 
 /**
@@ -171,16 +180,18 @@ export const GetSopResponse = zod.object({
       createdAt: zod.coerce.date(),
     }),
   ),
-  assignments: zod.array(
-    zod.object({
-      id: zod.number(),
-      assigneeName: zod.string(),
-      assigneeEmail: zod.string(),
-      status: zod.string(),
-      dueDate: zod.string().nullish(),
-      createdAt: zod.coerce.date(),
-    }),
-  ).optional(),
+  assignments: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        assigneeName: zod.string(),
+        assigneeEmail: zod.string(),
+        status: zod.string(),
+        dueDate: zod.coerce.date().nullish(),
+        createdAt: zod.coerce.date(),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -497,6 +508,17 @@ export const GetDashboardSummaryResponse = zod.object({
   overdueTasks: zod.number(),
   overdueComplianceItems: zod.number(),
   upcomingComplianceItems: zod.number(),
+  nextDueComplianceItem: zod.union([
+    zod.null(),
+    zod.object({
+      id: zod.number(),
+      title: zod.string(),
+      category: zod.string(),
+      dueDate: zod.coerce.date(),
+      status: zod.enum(["pending", "upcoming", "overdue", "completed"]),
+      daysUntilDue: zod.number(),
+    }),
+  ]),
   teamMemberCount: zod.number(),
   recentActivity: zod.array(
     zod.object({

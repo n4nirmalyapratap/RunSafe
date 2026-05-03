@@ -633,12 +633,17 @@ components:
         createdAt:
           type: string
           format: date-time
+        userRole:
+          type: string
+          enum: [owner, member]
+          description: Server-resolved role for the authenticated user in this workspace.
       required:
         - id
         - name
         - plan
         - ownerClerkId
         - createdAt
+        - userRole
 
     CreateWorkspaceBody:
       type: object
@@ -769,6 +774,8 @@ components:
           type: string
         description:
           type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
         category:
           type: ["string", "null"]
         createdByClerkId:
@@ -783,6 +790,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SopStep"
+        assignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/SopAssignment"
       required:
         - id
         - workspaceId
@@ -791,6 +802,30 @@ components:
         - createdAt
         - updatedAt
         - steps
+
+    SopAssignment:
+      type: object
+      properties:
+        id:
+          type: integer
+        assigneeName:
+          type: string
+        assigneeEmail:
+          type: string
+        status:
+          type: string
+        dueDate:
+          type: ["string", "null"]
+          format: date
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - assigneeName
+        - assigneeEmail
+        - status
+        - createdAt
 
     SopStep:
       type: object
@@ -833,6 +868,8 @@ components:
         title:
           type: string
         description:
+          type: string
+        notes:
           type: string
         category:
           type: string
@@ -1091,12 +1128,21 @@ components:
           type: integer
         upcomingComplianceItems:
           type: integer
+        nextDueComplianceItem:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/NextDueComplianceItem"
         teamMemberCount:
           type: integer
         recentActivity:
           type: array
           items:
             $ref: "#/components/schemas/ActivityItem"
+        upcomingComplianceDeadlines:
+          type: array
+          items:
+            $ref: "#/components/schemas/UpcomingComplianceDeadline"
+          default: []
       required:
         - totalSops
         - totalTaskAssignments
@@ -1105,8 +1151,59 @@ components:
         - overdueTasks
         - overdueComplianceItems
         - upcomingComplianceItems
+        - nextDueComplianceItem
         - teamMemberCount
         - recentActivity
+
+    UpcomingComplianceDeadline:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        category:
+          type: string
+        dueDate:
+          type: string
+          format: date
+        daysUntilDue:
+          type: integer
+        status:
+          type: string
+          enum: [overdue, upcoming]
+      required:
+        - id
+        - title
+        - category
+        - dueDate
+        - daysUntilDue
+        - status
+
+    NextDueComplianceItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        category:
+          type: string
+        dueDate:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [pending, upcoming, overdue, completed]
+        daysUntilDue:
+          type: integer
+      required:
+        - id
+        - title
+        - category
+        - dueDate
+        - status
+        - daysUntilDue
 
     ActivityItem:
       type: object

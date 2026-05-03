@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ActivityItem } from "./activityItem";
+import type { NextDueComplianceItem } from "./nextDueComplianceItem";
 
 export interface DashboardSummary {
   totalSops: number;
@@ -15,6 +16,7 @@ export interface DashboardSummary {
   overdueTasks: number;
   overdueComplianceItems: number;
   upcomingComplianceItems: number;
+  nextDueComplianceItem: null | NextDueComplianceItem;
   teamMemberCount: number;
   recentActivity: ActivityItem[];
 }
