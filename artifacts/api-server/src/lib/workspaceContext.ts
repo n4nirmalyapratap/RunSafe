@@ -69,9 +69,10 @@ export async function getWorkspaceContext(
   // 3. Email-based auto-link for invited members whose clerkId is not yet set
   try {
     const clerkUser = await clerk.users.getUser(clerkId);
-    const primaryEmail = clerkUser.emailAddresses.find(
-      (e) => e.id === clerkUser.primaryEmailAddressId,
-    )?.emailAddress;
+    const primaryEmail = clerkUser.emailAddresses
+      .find((e) => e.id === clerkUser.primaryEmailAddressId)
+      ?.emailAddress?.trim()
+      .toLowerCase();
 
     if (primaryEmail) {
       const [unlinked] = await db

@@ -82,21 +82,25 @@ router.post("/team", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
+  // Normalize email to lowercase to keep insert + auto-link match consistent.
+  const normalizedEmail = parsed.data.email.trim().toLowerCase();
+
   const [member] = await db
     .insert(teamMembersTable)
     .values({
       workspaceId: ctx.workspaceId,
-      email: parsed.data.email,
+      email: normalizedEmail,
       name: parsed.data.name,
       role: parsed.data.role ?? "employee",
       status: "invited",
     })
     .returning();
 
-  // Fire the Clerk invitation email (best-effort).
-  await sendInviteEmail(parsed.data.email);
+  // Fire the Clerk invitation email (best-effort) and surface delivery
+  // status to the caller so the UI can warn when it fails.
+  const invite = await sendInviteEmail(normalizedEmail);
 
-  res.status(201).json(member);
+  res.status(201).json({ ...member, inviteSent: invite.sent });
 });
 
 router.patch("/team/:memberId", requireAuth, async (req, res): Promise<void> => {
