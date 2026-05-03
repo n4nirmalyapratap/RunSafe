@@ -1,0 +1,31 @@
+kind = "slides"
+previewPath = "/runsafe-pitch/"
+title = "RunSafe Stakeholder Pitch"
+version = "1.0.0"
+id = "artifacts/runsafe-pitch"
+router = "path"
+
+[[integratedSkills]]
+name = "slides"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/runsafe-pitch/" ]
+localPort = 23288
+
+[services.development]
+run = "pnpm --filter @workspace/runsafe-pitch run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/runsafe-pitch", "run", "build" ]
+publicDir = "artifacts/runsafe-pitch/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23288"
+BASE_PATH = "/runsafe-pitch/"
