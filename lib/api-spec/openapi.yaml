@@ -801,7 +801,7 @@ components:
           type: string
         role:
           type: string
-          enum: [owner, employee]
+          enum: [owner, manager, employee]
         status:
           type: string
           enum: [active, invited, inactive]
@@ -826,7 +826,7 @@ components:
           type: string
         role:
           type: string
-          enum: [owner, employee]
+          enum: [owner, manager, employee]
       required:
         - email
         - name
@@ -836,7 +836,7 @@ components:
       properties:
         role:
           type: string
-          enum: [owner, employee]
+          enum: [owner, manager, employee]
         status:
           type: string
           enum: [active, inactive]

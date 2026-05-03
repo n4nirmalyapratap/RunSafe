@@ -67,7 +67,7 @@ export function Settings() {
         qc.invalidateQueries({ queryKey: getGetComplianceItemsQueryKey() });
         toast({
           title: "Compliance checklist synced",
-          description: `${data.added} new item${data.added === 1 ? "" : "s"} added · ${data.skipped} already present.`,
+          description: `${data.added} added · ${(data as { removed?: number }).removed ?? 0} stale removed · ${data.skipped} already present.`,
         });
       },
       onError: (err) => {

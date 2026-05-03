@@ -11,5 +11,6 @@ export type InviteTeamMemberBodyRole =
 
 export const InviteTeamMemberBodyRole = {
   owner: "owner",
+  manager: "manager",
   employee: "employee",
 } as const;

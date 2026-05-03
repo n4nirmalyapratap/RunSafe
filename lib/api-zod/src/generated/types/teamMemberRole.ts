@@ -11,5 +11,6 @@ export type TeamMemberRole =
 
 export const TeamMemberRole = {
   owner: "owner",
+  manager: "manager",
   employee: "employee",
 } as const;

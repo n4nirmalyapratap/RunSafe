@@ -83,7 +83,7 @@ export const GetTeamMembersResponseItem = zod.object({
   clerkId: zod.string().nullish(),
   email: zod.string(),
   name: zod.string(),
-  role: zod.enum(["owner", "employee"]),
+  role: zod.enum(["owner", "manager", "employee"]),
   status: zod.enum(["active", "invited", "inactive"]),
   createdAt: zod.coerce.date(),
 });
@@ -95,7 +95,7 @@ export const GetTeamMembersResponse = zod.array(GetTeamMembersResponseItem);
 export const InviteTeamMemberBody = zod.object({
   email: zod.string(),
   name: zod.string(),
-  role: zod.enum(["owner", "employee"]).optional(),
+  role: zod.enum(["owner", "manager", "employee"]).optional(),
 });
 
 /**
@@ -106,7 +106,7 @@ export const UpdateTeamMemberParams = zod.object({
 });
 
 export const UpdateTeamMemberBody = zod.object({
-  role: zod.enum(["owner", "employee"]).optional(),
+  role: zod.enum(["owner", "manager", "employee"]).optional(),
   status: zod.enum(["active", "inactive"]).optional(),
 });
 
@@ -116,7 +116,7 @@ export const UpdateTeamMemberResponse = zod.object({
   clerkId: zod.string().nullish(),
   email: zod.string(),
   name: zod.string(),
-  role: zod.enum(["owner", "employee"]),
+  role: zod.enum(["owner", "manager", "employee"]),
   status: zod.enum(["active", "invited", "inactive"]),
   createdAt: zod.coerce.date(),
 });

@@ -11,5 +11,6 @@ export type UpdateTeamMemberBodyRole =
 
 export const UpdateTeamMemberBodyRole = {
   owner: "owner",
+  manager: "manager",
   employee: "employee",
 } as const;

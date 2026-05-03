@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { eq, and, desc, isNotNull, sql } from "drizzle-orm";
+import { eq, and, desc, isNotNull, isNull, notInArray, sql } from "drizzle-orm";
 import { db, complianceItemsTable, complianceCompletionsTable, workspacesTable } from "@workspace/db";
 import { sendEmail } from "../lib/email";
 import {
@@ -129,6 +129,27 @@ router.post("/compliance/sync", requireAuth, async (req, res): Promise<void> => 
     industry: ws?.industry ?? null,
   });
 
+  // Prune stale catalog items: remove pending, never-completed items whose
+  // titles are no longer in the current jurisdiction's catalog. This way,
+  // changing country/state/industry actually replaces the auto-seeded list
+  // instead of piling new items on top of old ones. Items that have ever
+  // been completed (lastCompletedAt set) are preserved to keep audit history.
+  const titles = templates.map((t) => t.title);
+  let removed = 0;
+  if (titles.length > 0) {
+    const deleted = await db
+      .delete(complianceItemsTable)
+      .where(
+        and(
+          eq(complianceItemsTable.workspaceId, ctx!.workspaceId),
+          isNull(complianceItemsTable.lastCompletedAt),
+          notInArray(complianceItemsTable.title, titles),
+        ),
+      )
+      .returning({ id: complianceItemsTable.id });
+    removed = deleted.length;
+  }
+
   // Race-safe: rely on the (workspace_id, title) unique index. ON CONFLICT
   // DO NOTHING means parallel /sync calls can never double-insert.
   let added = 0;
@@ -153,7 +174,7 @@ router.post("/compliance/sync", requireAuth, async (req, res): Promise<void> => 
     added = inserted.length;
   }
 
-  res.json({ added, skipped: templates.length - added });
+  res.json({ added, removed, skipped: templates.length - added });
 });
 
 router.post("/compliance/initialize", requireAuth, async (req, res): Promise<void> => {
