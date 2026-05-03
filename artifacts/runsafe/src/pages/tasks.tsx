@@ -17,7 +17,7 @@ export function Tasks() {
 
   const handleStatusChange = (taskId: number, status: "pending" | "in_progress" | "completed") => {
     updateTask.mutate(
-      { taskAssignmentId: taskId, data: { status } },
+      { taskId: taskId, data: { status } },
       { onSuccess: () => qc.invalidateQueries({ queryKey: getGetTaskAssignmentsQueryKey() }) }
     );
   };

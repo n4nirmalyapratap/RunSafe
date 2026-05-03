@@ -11,21 +11,15 @@ import {
 } from "@workspace/db";
 import { GetDashboardSummaryResponse } from "@workspace/api-zod";
 import { requireAuth, getClerkUserId } from "../middlewares/requireAuth";
+import { getWorkspaceContext } from "../lib/workspaceContext";
 
 const router: IRouter = Router();
 
-async function getWorkspaceId(clerkId: string): Promise<number | null> {
-  const [ws] = await db
-    .select()
-    .from(workspacesTable)
-    .where(eq(workspacesTable.ownerClerkId, clerkId));
-  return ws?.id ?? null;
-}
-
 router.get("/dashboard/summary", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
-  const workspaceId = await getWorkspaceId(clerkId);
-  if (!workspaceId) {
+  const ctx = await getWorkspaceContext(clerkId);
+
+  if (!ctx) {
     res.json(
       GetDashboardSummaryResponse.parse({
         totalSops: 0,
@@ -42,9 +36,15 @@ router.get("/dashboard/summary", requireAuth, async (req, res): Promise<void> =>
     return;
   }
 
+  const { workspaceId, role, memberId } = ctx;
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+  const taskScope =
+    role === "member" && memberId != null
+      ? and(eq(taskAssignmentsTable.workspaceId, workspaceId), eq(taskAssignmentsTable.assigneeId, memberId))
+      : eq(taskAssignmentsTable.workspaceId, workspaceId);
 
   const [totalSopsResult] = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -54,14 +54,14 @@ router.get("/dashboard/summary", requireAuth, async (req, res): Promise<void> =>
   const [totalTasksResult] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(taskAssignmentsTable)
-    .where(eq(taskAssignmentsTable.workspaceId, workspaceId));
+    .where(taskScope);
 
   const [pendingTasksResult] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(taskAssignmentsTable)
     .where(
       and(
-        eq(taskAssignmentsTable.workspaceId, workspaceId),
+        taskScope,
         sql`${taskAssignmentsTable.status} IN ('pending', 'in_progress')`,
       ),
     );
@@ -71,7 +71,7 @@ router.get("/dashboard/summary", requireAuth, async (req, res): Promise<void> =>
     .from(taskAssignmentsTable)
     .where(
       and(
-        eq(taskAssignmentsTable.workspaceId, workspaceId),
+        taskScope,
         eq(taskAssignmentsTable.status, "completed"),
         gte(taskAssignmentsTable.completedAt, startOfMonth),
       ),
@@ -82,7 +82,7 @@ router.get("/dashboard/summary", requireAuth, async (req, res): Promise<void> =>
     .from(taskAssignmentsTable)
     .where(
       and(
-        eq(taskAssignmentsTable.workspaceId, workspaceId),
+        taskScope,
         sql`${taskAssignmentsTable.status} != 'completed'`,
         sql`${taskAssignmentsTable.dueDate} < ${now.toISOString().split("T")[0]}`,
       ),
@@ -138,7 +138,7 @@ router.get("/dashboard/summary", requireAuth, async (req, res): Promise<void> =>
     .from(taskAssignmentsTable)
     .innerJoin(sopsTable, eq(sopsTable.id, taskAssignmentsTable.sopId))
     .innerJoin(teamMembersTable, eq(teamMembersTable.id, taskAssignmentsTable.assigneeId))
-    .where(eq(taskAssignmentsTable.workspaceId, workspaceId))
+    .where(taskScope)
     .orderBy(sql`${taskAssignmentsTable.createdAt} DESC`)
     .limit(3);
 

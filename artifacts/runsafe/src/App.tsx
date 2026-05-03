@@ -11,7 +11,7 @@ import { getClerkAppearance } from "@/lib/clerk-appearance";
 import { LandingPage } from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 
-import { useGetWorkspace } from "@workspace/api-client-react";
+import { useGetWorkspace, getGetWorkspaceQueryKey } from "@workspace/api-client-react";
 
 import { Dashboard } from "@/pages/dashboard";
 import { Sops } from "@/pages/sops";
@@ -83,7 +83,7 @@ function HomeRedirect() {
 }
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
-  const { data: workspace, isLoading, error } = useGetWorkspace({ query: { retry: false } });
+  const { data: workspace, isLoading, error } = useGetWorkspace({ query: { retry: false, queryKey: getGetWorkspaceQueryKey() } });
   const [location] = useLocation();
 
   return (

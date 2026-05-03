@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
-import { db, workspacesTable, teamMembersTable } from "@workspace/db";
+import { db, teamMembersTable } from "@workspace/db";
 import {
   GetTeamMembersResponse,
   InviteTeamMemberBody,
@@ -10,21 +10,14 @@ import {
   RemoveTeamMemberParams,
 } from "@workspace/api-zod";
 import { requireAuth, getClerkUserId } from "../middlewares/requireAuth";
+import { getWorkspaceContext } from "../lib/workspaceContext";
 
 const router: IRouter = Router();
 
-async function getWorkspaceId(clerkId: string): Promise<number | null> {
-  const [ws] = await db
-    .select()
-    .from(workspacesTable)
-    .where(eq(workspacesTable.ownerClerkId, clerkId));
-  return ws?.id ?? null;
-}
-
 router.get("/team", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
-  const workspaceId = await getWorkspaceId(clerkId);
-  if (!workspaceId) {
+  const ctx = await getWorkspaceContext(clerkId);
+  if (!ctx) {
     res.json([]);
     return;
   }
@@ -32,16 +25,21 @@ router.get("/team", requireAuth, async (req, res): Promise<void> => {
   const members = await db
     .select()
     .from(teamMembersTable)
-    .where(eq(teamMembersTable.workspaceId, workspaceId));
+    .where(eq(teamMembersTable.workspaceId, ctx.workspaceId));
 
   res.json(GetTeamMembersResponse.parse(members));
 });
 
 router.post("/team", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
-  const workspaceId = await getWorkspaceId(clerkId);
-  if (!workspaceId) {
+  const ctx = await getWorkspaceContext(clerkId);
+  if (!ctx) {
     res.status(404).json({ error: "Workspace not found" });
+    return;
+  }
+
+  if (ctx.role !== "owner") {
+    res.status(403).json({ error: "Only workspace owners can invite team members" });
     return;
   }
 
@@ -54,7 +52,7 @@ router.post("/team", requireAuth, async (req, res): Promise<void> => {
   const [member] = await db
     .insert(teamMembersTable)
     .values({
-      workspaceId,
+      workspaceId: ctx.workspaceId,
       email: parsed.data.email,
       name: parsed.data.name,
       role: parsed.data.role ?? "employee",
@@ -67,9 +65,14 @@ router.post("/team", requireAuth, async (req, res): Promise<void> => {
 
 router.patch("/team/:memberId", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
-  const workspaceId = await getWorkspaceId(clerkId);
-  if (!workspaceId) {
+  const ctx = await getWorkspaceContext(clerkId);
+  if (!ctx) {
     res.status(404).json({ error: "Workspace not found" });
+    return;
+  }
+
+  if (ctx.role !== "owner") {
+    res.status(403).json({ error: "Only workspace owners can update team members" });
     return;
   }
 
@@ -91,7 +94,7 @@ router.patch("/team/:memberId", requireAuth, async (req, res): Promise<void> => 
     .where(
       and(
         eq(teamMembersTable.id, params.data.memberId),
-        eq(teamMembersTable.workspaceId, workspaceId),
+        eq(teamMembersTable.workspaceId, ctx.workspaceId),
       ),
     )
     .returning();
@@ -106,9 +109,14 @@ router.patch("/team/:memberId", requireAuth, async (req, res): Promise<void> => 
 
 router.delete("/team/:memberId", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
-  const workspaceId = await getWorkspaceId(clerkId);
-  if (!workspaceId) {
+  const ctx = await getWorkspaceContext(clerkId);
+  if (!ctx) {
     res.status(404).json({ error: "Workspace not found" });
+    return;
+  }
+
+  if (ctx.role !== "owner") {
+    res.status(403).json({ error: "Only workspace owners can remove team members" });
     return;
   }
 
@@ -123,7 +131,7 @@ router.delete("/team/:memberId", requireAuth, async (req, res): Promise<void> =>
     .where(
       and(
         eq(teamMembersTable.id, params.data.memberId),
-        eq(teamMembersTable.workspaceId, workspaceId),
+        eq(teamMembersTable.workspaceId, ctx.workspaceId),
       ),
     );
 

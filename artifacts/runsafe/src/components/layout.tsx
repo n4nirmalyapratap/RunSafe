@@ -18,7 +18,7 @@ export function Sidebar({ mobile = false, close = () => {} }: { mobile?: boolean
   ];
 
   const handleSignOut = () => {
-    signOut(() => window.location.href = import.meta.env.BASE_URL);
+    signOut(() => { window.location.href = import.meta.env.BASE_URL; });
   };
 
   const navContent = (

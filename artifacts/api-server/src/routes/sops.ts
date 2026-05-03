@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, asc, sql } from "drizzle-orm";
-import { db, workspacesTable, sopsTable, sopStepsTable, teamMembersTable, taskAssignmentsTable } from "@workspace/db";
+import { db, sopsTable, sopStepsTable, teamMembersTable, taskAssignmentsTable } from "@workspace/db";
 import {
   GetSopsQueryParams,
   GetSopsResponse,
@@ -23,21 +23,14 @@ import {
   AssignSopBody,
 } from "@workspace/api-zod";
 import { requireAuth, getClerkUserId } from "../middlewares/requireAuth";
+import { getWorkspaceContext } from "../lib/workspaceContext";
 
 const router: IRouter = Router();
 
-async function getWorkspaceId(clerkId: string): Promise<number | null> {
-  const [ws] = await db
-    .select()
-    .from(workspacesTable)
-    .where(eq(workspacesTable.ownerClerkId, clerkId));
-  return ws?.id ?? null;
-}
-
 router.get("/sops", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
-  const workspaceId = await getWorkspaceId(clerkId);
-  if (!workspaceId) {
+  const ctx = await getWorkspaceContext(clerkId);
+  if (!ctx) {
     res.json([]);
     return;
   }
@@ -60,8 +53,8 @@ router.get("/sops", requireAuth, async (req, res): Promise<void> => {
     .leftJoin(sopStepsTable, eq(sopStepsTable.sopId, sopsTable.id))
     .where(
       params.success && params.data.category
-        ? and(eq(sopsTable.workspaceId, workspaceId), eq(sopsTable.category, params.data.category))
-        : eq(sopsTable.workspaceId, workspaceId),
+        ? and(eq(sopsTable.workspaceId, ctx.workspaceId), eq(sopsTable.category, params.data.category))
+        : eq(sopsTable.workspaceId, ctx.workspaceId),
     )
     .groupBy(sopsTable.id)
     .orderBy(asc(sopsTable.createdAt));
@@ -72,9 +65,14 @@ router.get("/sops", requireAuth, async (req, res): Promise<void> => {
 
 router.post("/sops", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
-  const workspaceId = await getWorkspaceId(clerkId);
-  if (!workspaceId) {
+  const ctx = await getWorkspaceContext(clerkId);
+  if (!ctx) {
     res.status(404).json({ error: "Workspace not found" });
+    return;
+  }
+
+  if (ctx.role !== "owner") {
+    res.status(403).json({ error: "Only workspace owners can create SOPs" });
     return;
   }
 
@@ -86,7 +84,7 @@ router.post("/sops", requireAuth, async (req, res): Promise<void> => {
 
   const [sop] = await db
     .insert(sopsTable)
-    .values({ ...parsed.data, workspaceId, createdByClerkId: clerkId })
+    .values({ ...parsed.data, workspaceId: ctx.workspaceId, createdByClerkId: clerkId })
     .returning();
 
   res.status(201).json({ ...sop, stepCount: 0 });
@@ -94,8 +92,8 @@ router.post("/sops", requireAuth, async (req, res): Promise<void> => {
 
 router.get("/sops/:sopId", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
-  const workspaceId = await getWorkspaceId(clerkId);
-  if (!workspaceId) {
+  const ctx = await getWorkspaceContext(clerkId);
+  if (!ctx) {
     res.status(404).json({ error: "Workspace not found" });
     return;
   }
@@ -109,7 +107,7 @@ router.get("/sops/:sopId", requireAuth, async (req, res): Promise<void> => {
   const [sop] = await db
     .select()
     .from(sopsTable)
-    .where(and(eq(sopsTable.id, params.data.sopId), eq(sopsTable.workspaceId, workspaceId)));
+    .where(and(eq(sopsTable.id, params.data.sopId), eq(sopsTable.workspaceId, ctx.workspaceId)));
 
   if (!sop) {
     res.status(404).json({ error: "SOP not found" });
@@ -122,14 +120,33 @@ router.get("/sops/:sopId", requireAuth, async (req, res): Promise<void> => {
     .where(eq(sopStepsTable.sopId, sop.id))
     .orderBy(asc(sopStepsTable.orderIndex));
 
-  res.json(GetSopResponse.parse({ ...sop, steps }));
+  const assignments = await db
+    .select({
+      id: taskAssignmentsTable.id,
+      assigneeName: teamMembersTable.name,
+      assigneeEmail: teamMembersTable.email,
+      status: taskAssignmentsTable.status,
+      dueDate: taskAssignmentsTable.dueDate,
+      createdAt: taskAssignmentsTable.createdAt,
+    })
+    .from(taskAssignmentsTable)
+    .innerJoin(teamMembersTable, eq(teamMembersTable.id, taskAssignmentsTable.assigneeId))
+    .where(eq(taskAssignmentsTable.sopId, sop.id))
+    .orderBy(asc(taskAssignmentsTable.createdAt));
+
+  res.json(GetSopResponse.parse({ ...sop, steps, assignments }));
 });
 
 router.patch("/sops/:sopId", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
-  const workspaceId = await getWorkspaceId(clerkId);
-  if (!workspaceId) {
+  const ctx = await getWorkspaceContext(clerkId);
+  if (!ctx) {
     res.status(404).json({ error: "Workspace not found" });
+    return;
+  }
+
+  if (ctx.role !== "owner") {
+    res.status(403).json({ error: "Only workspace owners can update SOPs" });
     return;
   }
 
@@ -148,7 +165,7 @@ router.patch("/sops/:sopId", requireAuth, async (req, res): Promise<void> => {
   const [sop] = await db
     .update(sopsTable)
     .set(parsed.data)
-    .where(and(eq(sopsTable.id, params.data.sopId), eq(sopsTable.workspaceId, workspaceId)))
+    .where(and(eq(sopsTable.id, params.data.sopId), eq(sopsTable.workspaceId, ctx.workspaceId)))
     .returning();
 
   if (!sop) {
@@ -166,9 +183,14 @@ router.patch("/sops/:sopId", requireAuth, async (req, res): Promise<void> => {
 
 router.delete("/sops/:sopId", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
-  const workspaceId = await getWorkspaceId(clerkId);
-  if (!workspaceId) {
+  const ctx = await getWorkspaceContext(clerkId);
+  if (!ctx) {
     res.status(404).json({ error: "Workspace not found" });
+    return;
+  }
+
+  if (ctx.role !== "owner") {
+    res.status(403).json({ error: "Only workspace owners can delete SOPs" });
     return;
   }
 
@@ -180,15 +202,37 @@ router.delete("/sops/:sopId", requireAuth, async (req, res): Promise<void> => {
 
   await db
     .delete(sopsTable)
-    .where(and(eq(sopsTable.id, params.data.sopId), eq(sopsTable.workspaceId, workspaceId)));
+    .where(and(eq(sopsTable.id, params.data.sopId), eq(sopsTable.workspaceId, ctx.workspaceId)));
 
   res.sendStatus(204);
 });
 
 router.post("/sops/:sopId/steps", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = getClerkUserId(req);
+  const ctx = await getWorkspaceContext(clerkId);
+  if (!ctx) {
+    res.status(404).json({ error: "Workspace not found" });
+    return;
+  }
+
+  if (ctx.role !== "owner") {
+    res.status(403).json({ error: "Only workspace owners can add SOP steps" });
+    return;
+  }
+
   const params = AddSopStepParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [sop] = await db
+    .select()
+    .from(sopsTable)
+    .where(and(eq(sopsTable.id, params.data.sopId), eq(sopsTable.workspaceId, ctx.workspaceId)));
+
+  if (!sop) {
+    res.status(404).json({ error: "SOP not found" });
     return;
   }
 
@@ -214,9 +258,31 @@ router.post("/sops/:sopId/steps", requireAuth, async (req, res): Promise<void> =
 });
 
 router.put("/sops/:sopId/steps", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = getClerkUserId(req);
+  const ctx = await getWorkspaceContext(clerkId);
+  if (!ctx) {
+    res.status(404).json({ error: "Workspace not found" });
+    return;
+  }
+
+  if (ctx.role !== "owner") {
+    res.status(403).json({ error: "Only workspace owners can reorder SOP steps" });
+    return;
+  }
+
   const params = ReorderSopStepsParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [sop] = await db
+    .select()
+    .from(sopsTable)
+    .where(and(eq(sopsTable.id, params.data.sopId), eq(sopsTable.workspaceId, ctx.workspaceId)));
+
+  if (!sop) {
+    res.status(404).json({ error: "SOP not found" });
     return;
   }
 
@@ -241,9 +307,31 @@ router.put("/sops/:sopId/steps", requireAuth, async (req, res): Promise<void> =>
 });
 
 router.patch("/sops/:sopId/steps/:stepId", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = getClerkUserId(req);
+  const ctx = await getWorkspaceContext(clerkId);
+  if (!ctx) {
+    res.status(404).json({ error: "Workspace not found" });
+    return;
+  }
+
+  if (ctx.role !== "owner") {
+    res.status(403).json({ error: "Only workspace owners can update SOP steps" });
+    return;
+  }
+
   const params = UpdateSopStepParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [sop] = await db
+    .select()
+    .from(sopsTable)
+    .where(and(eq(sopsTable.id, params.data.sopId), eq(sopsTable.workspaceId, ctx.workspaceId)));
+
+  if (!sop) {
+    res.status(404).json({ error: "SOP not found" });
     return;
   }
 
@@ -268,9 +356,31 @@ router.patch("/sops/:sopId/steps/:stepId", requireAuth, async (req, res): Promis
 });
 
 router.delete("/sops/:sopId/steps/:stepId", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = getClerkUserId(req);
+  const ctx = await getWorkspaceContext(clerkId);
+  if (!ctx) {
+    res.status(404).json({ error: "Workspace not found" });
+    return;
+  }
+
+  if (ctx.role !== "owner") {
+    res.status(403).json({ error: "Only workspace owners can delete SOP steps" });
+    return;
+  }
+
   const params = DeleteSopStepParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [sop] = await db
+    .select()
+    .from(sopsTable)
+    .where(and(eq(sopsTable.id, params.data.sopId), eq(sopsTable.workspaceId, ctx.workspaceId)));
+
+  if (!sop) {
+    res.status(404).json({ error: "SOP not found" });
     return;
   }
 
@@ -283,9 +393,14 @@ router.delete("/sops/:sopId/steps/:stepId", requireAuth, async (req, res): Promi
 
 router.post("/sops/:sopId/assign", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
-  const workspaceId = await getWorkspaceId(clerkId);
-  if (!workspaceId) {
+  const ctx = await getWorkspaceContext(clerkId);
+  if (!ctx) {
     res.status(404).json({ error: "Workspace not found" });
+    return;
+  }
+
+  if (ctx.role !== "owner") {
+    res.status(403).json({ error: "Only workspace owners can assign SOPs" });
     return;
   }
 
@@ -301,7 +416,11 @@ router.post("/sops/:sopId/assign", requireAuth, async (req, res): Promise<void> 
     return;
   }
 
-  const [sop] = await db.select().from(sopsTable).where(eq(sopsTable.id, params.data.sopId));
+  const [sop] = await db
+    .select()
+    .from(sopsTable)
+    .where(and(eq(sopsTable.id, params.data.sopId), eq(sopsTable.workspaceId, ctx.workspaceId)));
+
   if (!sop) {
     res.status(404).json({ error: "SOP not found" });
     return;
@@ -310,7 +429,7 @@ router.post("/sops/:sopId/assign", requireAuth, async (req, res): Promise<void> 
   const [assignee] = await db
     .select()
     .from(teamMembersTable)
-    .where(eq(teamMembersTable.id, parsed.data.assigneeId));
+    .where(and(eq(teamMembersTable.id, parsed.data.assigneeId), eq(teamMembersTable.workspaceId, ctx.workspaceId)));
 
   if (!assignee) {
     res.status(404).json({ error: "Assignee not found" });
@@ -322,14 +441,17 @@ router.post("/sops/:sopId/assign", requireAuth, async (req, res): Promise<void> 
     .from(sopStepsTable)
     .where(eq(sopStepsTable.sopId, params.data.sopId));
 
+  const assignDueDate = parsed.data.dueDate
+    ? (parsed.data.dueDate as Date).toISOString().split("T")[0]
+    : null;
   const [assignment] = await db
     .insert(taskAssignmentsTable)
     .values({
       sopId: params.data.sopId,
-      workspaceId,
+      workspaceId: ctx.workspaceId,
       assigneeId: parsed.data.assigneeId,
       status: "pending",
-      dueDate: parsed.data.dueDate ?? null,
+      dueDate: assignDueDate,
       notes: parsed.data.notes ?? null,
     })
     .returning();

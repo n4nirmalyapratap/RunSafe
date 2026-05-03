@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, desc } from "drizzle-orm";
-import { db, workspacesTable, complianceItemsTable, complianceCompletionsTable } from "@workspace/db";
+import { db, complianceItemsTable, complianceCompletionsTable } from "@workspace/db";
 import {
   GetComplianceItemsQueryParams,
   GetComplianceItemsResponse,
@@ -14,16 +14,9 @@ import {
   GetComplianceAuditLogResponse,
 } from "@workspace/api-zod";
 import { requireAuth, getClerkUserId } from "../middlewares/requireAuth";
+import { getWorkspaceContext } from "../lib/workspaceContext";
 
 const router: IRouter = Router();
-
-async function getWorkspaceId(clerkId: string): Promise<number | null> {
-  const [ws] = await db
-    .select()
-    .from(workspacesTable)
-    .where(eq(workspacesTable.ownerClerkId, clerkId));
-  return ws?.id ?? null;
-}
 
 function computeStatus(dueDate: string | null, lastCompletedAt: Date | null): string {
   if (!dueDate) return "pending";
@@ -37,8 +30,8 @@ function computeStatus(dueDate: string | null, lastCompletedAt: Date | null): st
 
 router.get("/compliance/items", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
-  const workspaceId = await getWorkspaceId(clerkId);
-  if (!workspaceId) {
+  const ctx = await getWorkspaceContext(clerkId);
+  if (!ctx) {
     res.json([]);
     return;
   }
@@ -51,10 +44,10 @@ router.get("/compliance/items", requireAuth, async (req, res): Promise<void> => 
     .where(
       params.success && params.data.category
         ? and(
-            eq(complianceItemsTable.workspaceId, workspaceId),
+            eq(complianceItemsTable.workspaceId, ctx.workspaceId),
             eq(complianceItemsTable.category, params.data.category),
           )
-        : eq(complianceItemsTable.workspaceId, workspaceId),
+        : eq(complianceItemsTable.workspaceId, ctx.workspaceId),
     );
 
   const enriched = items.map((item) => ({
@@ -67,9 +60,14 @@ router.get("/compliance/items", requireAuth, async (req, res): Promise<void> => 
 
 router.post("/compliance/items", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
-  const workspaceId = await getWorkspaceId(clerkId);
-  if (!workspaceId) {
+  const ctx = await getWorkspaceContext(clerkId);
+  if (!ctx) {
     res.status(404).json({ error: "Workspace not found" });
+    return;
+  }
+
+  if (ctx.role !== "owner") {
+    res.status(403).json({ error: "Only workspace owners can create compliance items" });
     return;
   }
 
@@ -79,12 +77,14 @@ router.post("/compliance/items", requireAuth, async (req, res): Promise<void> =>
     return;
   }
 
+  const { dueDate: dueDateRaw, ...complianceRest } = parsed.data;
   const [item] = await db
     .insert(complianceItemsTable)
     .values({
-      ...parsed.data,
-      workspaceId,
+      ...complianceRest,
+      workspaceId: ctx.workspaceId,
       status: "pending",
+      dueDate: dueDateRaw ? (dueDateRaw as Date).toISOString().split("T")[0] : undefined,
     })
     .returning();
 
@@ -93,9 +93,14 @@ router.post("/compliance/items", requireAuth, async (req, res): Promise<void> =>
 
 router.patch("/compliance/items/:itemId", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
-  const workspaceId = await getWorkspaceId(clerkId);
-  if (!workspaceId) {
+  const ctx = await getWorkspaceContext(clerkId);
+  if (!ctx) {
     res.status(404).json({ error: "Workspace not found" });
+    return;
+  }
+
+  if (ctx.role !== "owner") {
+    res.status(403).json({ error: "Only workspace owners can update compliance items" });
     return;
   }
 
@@ -111,13 +116,20 @@ router.patch("/compliance/items/:itemId", requireAuth, async (req, res): Promise
     return;
   }
 
+  const { dueDate: updateDueDateRaw, ...updateRest } = parsed.data;
+  const updatePayload = {
+    ...updateRest,
+    ...(updateDueDateRaw !== undefined
+      ? { dueDate: updateDueDateRaw ? (updateDueDateRaw as Date).toISOString().split("T")[0] : null }
+      : {}),
+  };
   const [item] = await db
     .update(complianceItemsTable)
-    .set(parsed.data)
+    .set(updatePayload)
     .where(
       and(
         eq(complianceItemsTable.id, params.data.itemId),
-        eq(complianceItemsTable.workspaceId, workspaceId),
+        eq(complianceItemsTable.workspaceId, ctx.workspaceId),
       ),
     )
     .returning();
@@ -132,9 +144,14 @@ router.patch("/compliance/items/:itemId", requireAuth, async (req, res): Promise
 
 router.delete("/compliance/items/:itemId", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
-  const workspaceId = await getWorkspaceId(clerkId);
-  if (!workspaceId) {
+  const ctx = await getWorkspaceContext(clerkId);
+  if (!ctx) {
     res.status(404).json({ error: "Workspace not found" });
+    return;
+  }
+
+  if (ctx.role !== "owner") {
+    res.status(403).json({ error: "Only workspace owners can delete compliance items" });
     return;
   }
 
@@ -149,7 +166,7 @@ router.delete("/compliance/items/:itemId", requireAuth, async (req, res): Promis
     .where(
       and(
         eq(complianceItemsTable.id, params.data.itemId),
-        eq(complianceItemsTable.workspaceId, workspaceId),
+        eq(complianceItemsTable.workspaceId, ctx.workspaceId),
       ),
     );
 
@@ -158,6 +175,11 @@ router.delete("/compliance/items/:itemId", requireAuth, async (req, res): Promis
 
 router.post("/compliance/items/:itemId/complete", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
+  const ctx = await getWorkspaceContext(clerkId);
+  if (!ctx) {
+    res.status(404).json({ error: "Workspace not found" });
+    return;
+  }
 
   const params = CompleteComplianceItemParams.safeParse(req.params);
   if (!params.success) {
@@ -171,14 +193,34 @@ router.post("/compliance/items/:itemId/complete", requireAuth, async (req, res):
     return;
   }
 
+  const [existingItem] = await db
+    .select()
+    .from(complianceItemsTable)
+    .where(
+      and(
+        eq(complianceItemsTable.id, params.data.itemId),
+        eq(complianceItemsTable.workspaceId, ctx.workspaceId),
+      ),
+    );
+
+  if (!existingItem) {
+    res.status(404).json({ error: "Compliance item not found" });
+    return;
+  }
+
   const completedAt = parsed.data.completedAt ? new Date(parsed.data.completedAt) : new Date();
 
   await db
     .update(complianceItemsTable)
     .set({ lastCompletedAt: completedAt, status: "completed" })
-    .where(eq(complianceItemsTable.id, params.data.itemId));
+    .where(
+      and(
+        eq(complianceItemsTable.id, params.data.itemId),
+        eq(complianceItemsTable.workspaceId, ctx.workspaceId),
+      ),
+    );
 
-  const [item] = await db
+  const [updatedItem] = await db
     .select()
     .from(complianceItemsTable)
     .where(eq(complianceItemsTable.id, params.data.itemId));
@@ -196,14 +238,14 @@ router.post("/compliance/items/:itemId/complete", requireAuth, async (req, res):
 
   res.status(201).json({
     ...completion,
-    complianceItemTitle: item?.title ?? "",
+    complianceItemTitle: updatedItem?.title ?? "",
   });
 });
 
 router.get("/compliance/audit-log", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
-  const workspaceId = await getWorkspaceId(clerkId);
-  if (!workspaceId) {
+  const ctx = await getWorkspaceContext(clerkId);
+  if (!ctx) {
     res.json([]);
     return;
   }
@@ -220,7 +262,7 @@ router.get("/compliance/audit-log", requireAuth, async (req, res): Promise<void>
     })
     .from(complianceCompletionsTable)
     .innerJoin(complianceItemsTable, eq(complianceItemsTable.id, complianceCompletionsTable.complianceItemId))
-    .where(eq(complianceItemsTable.workspaceId, workspaceId))
+    .where(eq(complianceItemsTable.workspaceId, ctx.workspaceId))
     .orderBy(desc(complianceCompletionsTable.completedAt));
 
   res.json(GetComplianceAuditLogResponse.parse(entries));

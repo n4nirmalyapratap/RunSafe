@@ -2,7 +2,6 @@ import { Router, type IRouter } from "express";
 import { eq, and, sql } from "drizzle-orm";
 import {
   db,
-  workspacesTable,
   taskAssignmentsTable,
   teamMembersTable,
   sopsTable,
@@ -19,26 +18,38 @@ import {
   CompleteTaskStepResponse,
 } from "@workspace/api-zod";
 import { requireAuth, getClerkUserId } from "../middlewares/requireAuth";
+import { getWorkspaceContext } from "../lib/workspaceContext";
 
 const router: IRouter = Router();
 
-async function getWorkspaceId(clerkId: string): Promise<number | null> {
-  const [ws] = await db
-    .select()
-    .from(workspacesTable)
-    .where(eq(workspacesTable.ownerClerkId, clerkId));
-  return ws?.id ?? null;
-}
-
 router.get("/tasks", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
-  const workspaceId = await getWorkspaceId(clerkId);
-  if (!workspaceId) {
+  const ctx = await getWorkspaceContext(clerkId);
+  if (!ctx) {
     res.json([]);
     return;
   }
 
   const params = GetTaskAssignmentsQueryParams.safeParse(req.query);
+
+  const baseWhere = eq(taskAssignmentsTable.workspaceId, ctx.workspaceId);
+
+  const memberFilter =
+    ctx.role === "member" && ctx.memberId != null
+      ? eq(taskAssignmentsTable.assigneeId, ctx.memberId)
+      : undefined;
+
+  const statusFilter =
+    params.success && params.data.status
+      ? eq(taskAssignmentsTable.status, params.data.status)
+      : undefined;
+
+  const assigneeFilter =
+    params.success && params.data.assigneeId && ctx.role === "owner"
+      ? eq(taskAssignmentsTable.assigneeId, params.data.assigneeId)
+      : undefined;
+
+  const whereClause = and(baseWhere, memberFilter, statusFilter, assigneeFilter);
 
   const rows = await db
     .select({
@@ -60,25 +71,15 @@ router.get("/tasks", requireAuth, async (req, res): Promise<void> => {
     .from(taskAssignmentsTable)
     .innerJoin(sopsTable, eq(sopsTable.id, taskAssignmentsTable.sopId))
     .innerJoin(teamMembersTable, eq(teamMembersTable.id, taskAssignmentsTable.assigneeId))
-    .where(
-      params.success
-        ? and(
-            eq(taskAssignmentsTable.workspaceId, workspaceId),
-            params.data.status ? eq(taskAssignmentsTable.status, params.data.status) : undefined,
-            params.data.assigneeId
-              ? eq(taskAssignmentsTable.assigneeId, params.data.assigneeId)
-              : undefined,
-          )
-        : eq(taskAssignmentsTable.workspaceId, workspaceId),
-    );
+    .where(whereClause);
 
   res.json(GetTaskAssignmentsResponse.parse(rows));
 });
 
 router.patch("/tasks/:taskId", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
-  const workspaceId = await getWorkspaceId(clerkId);
-  if (!workspaceId) {
+  const ctx = await getWorkspaceContext(clerkId);
+  if (!ctx) {
     res.status(404).json({ error: "Workspace not found" });
     return;
   }
@@ -95,6 +96,18 @@ router.patch("/tasks/:taskId", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
+  const taskWhere =
+    ctx.role === "member" && ctx.memberId != null
+      ? and(
+          eq(taskAssignmentsTable.id, params.data.taskId),
+          eq(taskAssignmentsTable.workspaceId, ctx.workspaceId),
+          eq(taskAssignmentsTable.assigneeId, ctx.memberId),
+        )
+      : and(
+          eq(taskAssignmentsTable.id, params.data.taskId),
+          eq(taskAssignmentsTable.workspaceId, ctx.workspaceId),
+        );
+
   const updateData: Record<string, unknown> = { ...parsed.data };
   if (parsed.data.status === "completed") {
     updateData.completedAt = new Date();
@@ -103,12 +116,7 @@ router.patch("/tasks/:taskId", requireAuth, async (req, res): Promise<void> => {
   const [assignment] = await db
     .update(taskAssignmentsTable)
     .set(updateData)
-    .where(
-      and(
-        eq(taskAssignmentsTable.id, params.data.taskId),
-        eq(taskAssignmentsTable.workspaceId, workspaceId),
-      ),
-    )
+    .where(taskWhere)
     .returning();
 
   if (!assignment) {
@@ -145,9 +153,35 @@ router.patch("/tasks/:taskId", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.post("/tasks/:taskId/steps/:stepId/complete", requireAuth, async (req, res): Promise<void> => {
+  const clerkId = getClerkUserId(req);
+  const ctx = await getWorkspaceContext(clerkId);
+  if (!ctx) {
+    res.status(404).json({ error: "Workspace not found" });
+    return;
+  }
+
   const params = CompleteTaskStepParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const taskWhere =
+    ctx.role === "member" && ctx.memberId != null
+      ? and(
+          eq(taskAssignmentsTable.id, params.data.taskId),
+          eq(taskAssignmentsTable.workspaceId, ctx.workspaceId),
+          eq(taskAssignmentsTable.assigneeId, ctx.memberId),
+        )
+      : and(
+          eq(taskAssignmentsTable.id, params.data.taskId),
+          eq(taskAssignmentsTable.workspaceId, ctx.workspaceId),
+        );
+
+  const [task] = await db.select().from(taskAssignmentsTable).where(taskWhere);
+
+  if (!task) {
+    res.status(404).json({ error: "Task not found or not assigned to you" });
     return;
   }
 
