@@ -16,7 +16,8 @@ import type { SopDetail, SopAssignment } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, UserPlus, GripVertical, Users } from "lucide-react";
+import { ArrowLeft, Plus, UserPlus, GripVertical, Users, PlayCircle } from "lucide-react";
+import { SopVideoPlayer } from "@/components/sop-video-player";
 import { Link } from "wouter";
 import {
   Dialog,
@@ -159,6 +160,7 @@ export function SopDetail() {
 
   const [stepOpen, setStepOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [videoOpen, setVideoOpen] = useState(false);
   const [notes, setNotes] = useState<string>("");
 
   const stepForm = useForm<z.infer<typeof stepSchema>>({
@@ -213,6 +215,20 @@ export function SopDetail() {
             <h1 className="text-3xl font-bold tracking-tight">{sop.title}</h1>
             {sop.description && <p className="text-muted-foreground mt-1">{sop.description}</p>}
           </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setVideoOpen(true)}
+              disabled={(sop.steps ?? []).length === 0}
+              title={
+                (sop.steps ?? []).length === 0
+                  ? "Add steps before playing the training video"
+                  : "Watch this SOP as a narrated video"
+              }
+            >
+              <PlayCircle className="h-4 w-4 mr-2" /> Watch as Video
+            </Button>
 
           <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
             <DialogTrigger asChild>
@@ -302,7 +318,16 @@ export function SopDetail() {
               </Form>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
+
+        <SopVideoPlayer
+          open={videoOpen}
+          onOpenChange={setVideoOpen}
+          sopTitle={sop.title}
+          sopDescription={sop.description}
+          steps={sop.steps ?? []}
+        />
 
         <div className="bg-card border rounded-lg p-6">
           <div className="flex justify-between items-center mb-4">
