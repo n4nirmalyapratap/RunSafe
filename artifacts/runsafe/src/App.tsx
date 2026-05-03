@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { ClerkProvider, SignIn, SignUp, Show, useClerk, useUser } from '@clerk/react';
+import { ClerkProvider, SignIn, SignUp, Show, useClerk, useUser, useAuth } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from 'wouter';
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
@@ -11,7 +11,11 @@ import { getClerkAppearance } from "@/lib/clerk-appearance";
 import { LandingPage } from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 
-import { useGetWorkspace, getGetWorkspaceQueryKey } from "@workspace/api-client-react";
+import {
+  useGetWorkspace,
+  getGetWorkspaceQueryKey,
+  setAuthTokenGetter,
+} from "@workspace/api-client-react";
 
 import { Dashboard } from "@/pages/dashboard";
 import { Sops } from "@/pages/sops";
@@ -71,6 +75,35 @@ function ClerkQueryClientCacheInvalidator() {
     });
     return unsubscribe;
   }, [addListener, qc]);
+  return null;
+}
+
+/**
+ * Registers a Clerk-backed bearer token getter on the API client. This makes
+ * every API call carry `Authorization: Bearer <jwt>`, which Clerk's Express
+ * middleware accepts in addition to session cookies. Without this, requests
+ * silently 401 once the session cookie is missing/stale, leaving forms
+ * showing empty defaults (looks like data was lost).
+ */
+function ApiAuthTokenBridge() {
+  const { isLoaded, isSignedIn, getToken } = useAuth();
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (isSignedIn) {
+      setAuthTokenGetter(async () => {
+        try {
+          return (await getToken()) ?? null;
+        } catch {
+          return null;
+        }
+      });
+    } else {
+      setAuthTokenGetter(null);
+    }
+    return () => {
+      setAuthTokenGetter(null);
+    };
+  }, [isLoaded, isSignedIn, getToken]);
   return null;
 }
 
@@ -153,6 +186,7 @@ function ClerkProviderWithRoutes() {
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
       <QueryClientProvider client={queryClient}>
+        <ApiAuthTokenBridge />
         <ClerkQueryClientCacheInvalidator />
         <Switch>
           <Route path="/" component={HomeRedirect} />
