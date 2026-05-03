@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { ClerkProvider, SignIn, SignUp, Show, useClerk } from '@clerk/react';
+import { ClerkProvider, SignIn, SignUp, Show, useClerk, useUser } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from 'wouter';
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
@@ -82,17 +82,52 @@ function HomeRedirect() {
   );
 }
 
+function useWorkspaceRole() {
+  const { user } = useUser();
+  const { data: workspace, isLoading, error } = useGetWorkspace({
+    query: { retry: false, queryKey: getGetWorkspaceQueryKey() },
+  });
+  const isOwner = !!workspace && workspace.ownerClerkId === user?.id;
+  return { workspace, isOwner, isLoading, error };
+}
+
+/** Requires sign-in + workspace. Redirects to /onboarding if no workspace. */
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
-  const { data: workspace, isLoading, error } = useGetWorkspace({ query: { retry: false, queryKey: getGetWorkspaceQueryKey() } });
+  const { isLoading, error } = useWorkspaceRole();
   const [location] = useLocation();
 
   return (
     <>
       <Show when="signed-in">
         {isLoading ? (
-          <div className="min-h-screen flex items-center justify-center bg-background">Loading...</div>
+          <div className="min-h-screen flex items-center justify-center bg-background">Loading…</div>
         ) : error && (error as unknown as { status?: number }).status === 404 && location !== "/onboarding" ? (
           <Redirect to="/onboarding" />
+        ) : (
+          <Component />
+        )}
+      </Show>
+      <Show when="signed-out">
+        <Redirect to="/" />
+      </Show>
+    </>
+  );
+}
+
+/** Requires sign-in + workspace owner role. Redirects members to /dashboard. */
+function OwnerRoute({ component: Component }: { component: React.ComponentType }) {
+  const { isOwner, isLoading, error } = useWorkspaceRole();
+  const [location] = useLocation();
+
+  return (
+    <>
+      <Show when="signed-in">
+        {isLoading ? (
+          <div className="min-h-screen flex items-center justify-center bg-background">Loading…</div>
+        ) : error && (error as unknown as { status?: number }).status === 404 && location !== "/onboarding" ? (
+          <Redirect to="/onboarding" />
+        ) : !isLoading && !isOwner ? (
+          <Redirect to="/dashboard" />
         ) : (
           <Component />
         )}
@@ -123,16 +158,19 @@ function ClerkProviderWithRoutes() {
           <Route path="/" component={HomeRedirect} />
           <Route path="/sign-in/*?" component={SignInPage} />
           <Route path="/sign-up/*?" component={SignUpPage} />
-          
+
           <Route path="/onboarding"><Show when="signed-in"><Onboarding /></Show></Route>
-          
+
+          {/* Member-accessible routes */}
           <Route path="/dashboard"><ProtectedRoute component={Dashboard} /></Route>
-          <Route path="/sops"><ProtectedRoute component={Sops} /></Route>
-          <Route path="/sops/:sopId"><ProtectedRoute component={SopDetail} /></Route>
           <Route path="/tasks"><ProtectedRoute component={Tasks} /></Route>
-          <Route path="/compliance"><ProtectedRoute component={Compliance} /></Route>
-          <Route path="/team"><ProtectedRoute component={Team} /></Route>
-          <Route path="/settings"><ProtectedRoute component={Settings} /></Route>
+
+          {/* Owner-only routes — members redirected to /dashboard */}
+          <Route path="/sops"><OwnerRoute component={Sops} /></Route>
+          <Route path="/sops/:sopId"><OwnerRoute component={SopDetail} /></Route>
+          <Route path="/compliance"><OwnerRoute component={Compliance} /></Route>
+          <Route path="/team"><OwnerRoute component={Team} /></Route>
+          <Route path="/settings"><OwnerRoute component={Settings} /></Route>
 
           <Route component={NotFound} />
         </Switch>
