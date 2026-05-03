@@ -11,8 +11,38 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth, getClerkUserId } from "../middlewares/requireAuth";
 import { getWorkspaceContext } from "../lib/workspaceContext";
+import { createClerkClient } from "@clerk/express";
 
 const router: IRouter = Router();
+
+const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+
+/**
+ * Best-effort: send a Clerk invitation email to the invited team member.
+ * On success the member receives a sign-up link; on sign-up the
+ * email-based auto-link in getWorkspaceContext links them to the workspace.
+ * Failure is non-fatal — the team_members row still exists, and the user
+ * can sign up directly with the same email and be auto-linked.
+ */
+async function sendInviteEmail(email: string): Promise<{ sent: boolean; error?: string }> {
+  try {
+    const appOrigin =
+      process.env.RUNSAFE_APP_ORIGIN ||
+      (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : null);
+    const redirectUrl = appOrigin ? `${appOrigin}/sign-up` : undefined;
+
+    await clerk.invitations.createInvitation({
+      emailAddress: email,
+      redirectUrl,
+      ignoreExisting: true,
+    });
+    return { sent: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[team] Clerk invitation email failed for ${email}:`, msg);
+    return { sent: false, error: msg };
+  }
+}
 
 router.get("/team", requireAuth, async (req, res): Promise<void> => {
   const clerkId = getClerkUserId(req);
@@ -62,6 +92,9 @@ router.post("/team", requireAuth, async (req, res): Promise<void> => {
       status: "invited",
     })
     .returning();
+
+  // Fire the Clerk invitation email (best-effort).
+  await sendInviteEmail(parsed.data.email);
 
   res.status(201).json(member);
 });
